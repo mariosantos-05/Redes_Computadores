@@ -14,6 +14,9 @@ async def main():
         5000
     )
 
+    asyncio.create_task(
+        conn.listen()
+    )
     print("Connected!")
 
 asyncio.run(main())

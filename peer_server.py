@@ -39,6 +39,20 @@ class PeerServer:
 
                 await writer.drain()
 
+            
+            elif msg["type"] == "PING":
+                print("PING RECEIVED")
+
+                pong = {
+                    "type": "PONG",
+                }
+
+                writer.write(
+                    encode_message(pong)
+                )
+
+                print("PONG SENT")
+
 
 
     async def start(self):

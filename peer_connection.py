@@ -12,6 +12,28 @@ class PeerConnection:
         self.writer = None
         self.remote_peer_id = None
 
+    async def send(self, msg):
+
+        self.writer.write(
+            encode_message(msg)
+        )
+
+        await self.writer.drain()
+
+    async def listen(self):
+
+        while True:
+            data = await self.reader.readline()
+    
+            if not data:
+                break
+            
+            msg = decode_message(data)
+    
+            print("Received:", msg)
+
+
+
 
     async def connect(self, host, port):
 
@@ -29,10 +51,18 @@ class PeerConnection:
             "features": [],
             "ttl": 1
         }
+
+        ping_msg = {
+            "type": "PING",
+            "peer_id": self.peer_id,
+            "version": "1.0",
+            "features": [],
+            "ttl": 1
+        }
     
-        self.writer.write(
-            encode_message(hello_msg)
-        )
+        await self.send(hello_msg)
+
+        await self.send(ping_msg)
 
         await self.writer.drain()
 
