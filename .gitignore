@@ -1,0 +1,13 @@
+# Repositório do Professor
+pyp2p-rdv/
+
+# Venv
+.venv/
+venv/
+
+# PyCache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
