@@ -33,8 +33,6 @@ class PeerConnection:
             print("Received:", msg)
 
 
-
-
     async def connect(self, host, port):
 
         self.reader, self.writer = await asyncio.open_connection(

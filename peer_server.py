@@ -53,15 +53,12 @@ class PeerServer:
 
                 print("PONG SENT")
 
-
-
     async def start(self):
         server = await asyncio.start_server(
             self.handle_client,
             "0.0.0.0",
             self.port
         )
-
 
         print(f"listening on port {self.port}")
     
