@@ -1,6 +1,4 @@
 import asyncio
-# Nota: O import 'writer' do módulo csv não é utilizado e provavelmente foi importado por engano no lugar do StreamWriter do asyncio.
-from csv import writer
 from messages import decode_message
 from messages import encode_message
 
