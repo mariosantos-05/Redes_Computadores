@@ -2,8 +2,6 @@ import asyncio
 from messages import decode_message
 from messages import encode_message
 
-
-
 class PeerConnection:
 
     def __init__(self, peer_id):
@@ -61,6 +59,8 @@ class PeerConnection:
         await self.send(hello_msg)
 
         await self.send(ping_msg)
+
+        #await self.send("batata, teste string pura")
 
         await self.writer.drain()
 

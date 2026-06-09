@@ -10,7 +10,7 @@ async def main():
     8080
     )
 
-    register_msg = {
+    '''register_msg = {
         "type": "REGISTER",
         "namespace": "CIC",
         "name": "teste",
@@ -20,12 +20,12 @@ async def main():
 
     response = await rdv.request(
         register_msg
-    )
+    )'''
 
 
     discorver_msg = {
         "type": "DISCOVER",
-        "namespace": "CIC",
+        "namespace": "",
     }
 
     response = await rdv.request(

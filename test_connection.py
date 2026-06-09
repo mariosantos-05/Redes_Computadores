@@ -4,16 +4,15 @@ from peer_connection import PeerConnection
 
 
 async def main():
+
+    conn = PeerConnection("teste@CIC")
     
     print("Trying to connect...")
 
-    conn = PeerConnection("teste@CIC")
 
-
-    #Tentando conectar ao peer configurado do professor  (sabemos que ele esta em formato de "mirror")
     await conn.connect(
-        "45.171.101.167",
-        8081
+        "127.0.0.1",
+        5000
     )
 
     asyncio.create_task(
