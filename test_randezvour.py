@@ -13,6 +13,7 @@ async def main():
 
     # Mensagem de registro para o servidor Rendezvous
     register_msg = {
+
         "type": "REGISTER",
         "namespace": "CIC",
         "name": "teste",
@@ -23,6 +24,7 @@ async def main():
     # Envia a requisição de registro e aguarda a resposta (OK ou ERROR)
     response = await rdv.request(
         register_msg
+
     )
     print("Registration response:", response)
 
@@ -30,7 +32,7 @@ async def main():
     # Mensagem de descoberta para encontrar outros peers ativos no mesmo namespace
     discorver_msg = {
         "type": "DISCOVER",
-        "namespace": "CIC",
+        "namespace": "",
     }
 
     # Envia a requisição de descoberta e aguarda a resposta contendo a lista de peers ativos

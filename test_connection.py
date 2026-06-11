@@ -4,6 +4,8 @@ from peer_connection import PeerConnection
 
 
 async def main():
+
+    conn = PeerConnection("teste@CIC")
     
     print("Trying to connect...")
 
@@ -12,8 +14,8 @@ async def main():
 
     # Tentando conectar ao peer configurado do professor (executa em modo "mirror" na porta 8081)
     await conn.connect(
-        "45.171.101.167",
-        8081
+        "127.0.0.1",
+        5000
     )
 
     # Cria uma tarefa assíncrona em background para rodar o loop de escuta de novas mensagens deste peer
