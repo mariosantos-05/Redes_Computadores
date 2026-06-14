@@ -20,7 +20,7 @@ class Config:
         self.tcp_port = data.get("tcp_port", 5000)
         self.discover_interval = data.get("discover_interval", 20)
         self.keepalive_interval = data.get("keepalive_interval", 30)
-        self.rdv_ttl = data.get("rdv_ttl", 7200)
+        self.rdv_ttl = data.get("rdv_ttl", 3600)
         self.fixed_msg_ttl = data.get("fixed_msg_ttl", 1)
         self.namespace = data.get("namespace", "CIC")
         self.name = data.get("name", "Grupo_2")

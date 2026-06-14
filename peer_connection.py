@@ -1,8 +1,6 @@
 import asyncio
-from messages import decode_message
-from messages import encode_message
-
-
+from message_router import decode_message
+from message_router import encode_message
 
 class PeerConnection:
     """
@@ -86,6 +84,9 @@ class PeerConnection:
 
         # Envia a mensagem PING logo em seguida
         await self.send(ping_msg)
+
+
+        #await self.send("batata, teste string pura")
 
         # Garante que as mensagens foram transmitidas
         await self.writer.drain()

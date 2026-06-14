@@ -2,17 +2,15 @@ import asyncio
 from config import Config
 from peer_connection import PeerConnection
 
-config = Config()
-
 async def main():
     
     print("Trying to connect...")
 
-    # Cria uma nova instância de conexão representando o peer local 'teste@CIC'
-    conn = PeerConnection(f"{config.name}@{config.namespace}")
+    # Cria uma nova instância de conexão representando o peer local
+    conn = PeerConnection(f"{Config().name}@{Config().namespace}")
 
-    # Tentando conectar ao peer configurado do professor (executa em modo "mirror" na porta 8081)
-    await conn.connect(config.rdv_host, config.listen_port)
+    # Tentando conectar ao peer configurado do professor
+    await conn.connect(Config().rdv_host, Config().listen_port)
 
     # Cria uma tarefa assíncrona em background para rodar o loop de escuta de novas mensagens deste peer
     asyncio.create_task(
