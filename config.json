@@ -1,0 +1,25 @@
+{
+  "app_name": "pyp2p-chat",
+  "rdv_host": "rdv.mfcaetano.cc",
+  "rdv_port": 8080,
+  "listen_host": "0.0.0.0",
+  "listen_port": 8081,
+  "tcp_port": 5000,
+  "discover_interval": 20,
+  "keepalive_interval": 30,
+  "rdv_ttl": 3600,
+  "fixed_msg_ttl": 1,
+  "namespace": "CIC",
+  "name": "Grupo_2",
+  "type": [
+    "REGISTER",
+    "DISCOVER"
+  ],
+  "log_level": "INFO",
+  "features": [
+    "ack",
+    "metrics"
+  ],
+  "autonomous_mode": false,
+  "max_reconnect_attempts": 5
+}

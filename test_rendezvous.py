@@ -1,24 +1,22 @@
 import asyncio
-
-from randezvour_connection import RandezvousConnection
-
+from config import Config
+from rendezvous_connection import RendezvousConnection
 
 async def main():
 
     # Instancia o gerenciador de conexão com o servidor Rendezvous local/remoto de testes
-    rdv = RandezvousConnection(
-    "45.171.101.167",
-    8080
+    rdv = RendezvousConnection(
+        Config().rdv_host, 
+        Config().rdv_port
     )
 
     # Mensagem de registro para o servidor Rendezvous
     register_msg = {
-
-        "type": "REGISTER",
-        "namespace": "CIC",
-        "name": "teste",
-        "port": 5000,
-        "ttl": 3600 # Tempo de vida da entrada no servidor (1 hora)
+        "type": Config().type[0],
+        "namespace": Config().namespace,
+        "name": Config().name,
+        "port": Config().tcp_port,
+        "ttl": Config().rdv_ttl
     }
 
     # Envia a requisição de registro e aguarda a resposta (OK ou ERROR)
@@ -31,8 +29,8 @@ async def main():
 
     # Mensagem de descoberta para encontrar outros peers ativos no mesmo namespace
     discorver_msg = {
-        "type": "DISCOVER",
-        "namespace": "",
+        "type": Config().type[1],
+        "namespace": Config().namespace,
     }
 
     # Envia a requisição de descoberta e aguarda a resposta contendo a lista de peers ativos

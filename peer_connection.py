@@ -1,6 +1,6 @@
 import asyncio
-from messages import decode_message
-from messages import encode_message
+from message_router import decode_message
+from message_router import encode_message
 
 class PeerConnection:
     """

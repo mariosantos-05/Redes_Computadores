@@ -1,8 +1,6 @@
 import asyncio
-# Nota: O import 'writer' do módulo csv não é utilizado e provavelmente foi importado por engano no lugar do StreamWriter do asyncio.
-from csv import writer
-from messages import decode_message
-from messages import encode_message
+from message_router import decode_message
+from message_router import encode_message
 
 class PeerServer:
     """

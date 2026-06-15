@@ -5,10 +5,10 @@ Este documento rastreia o progresso do desenvolvimento do Chat P2P conforme os c
 ---
 
 ## 1. 🏗️ Arquitetura de Módulos e Estrutura Geral
-* [x] Criar estrutura básica de mensagens (JSON + `\n` bytes) — [messages.py](file:///home/caldo/Projects/UnB/Redes_Computadores/messages.py)
+* [x] Criar estrutura básica de mensagens (JSON + `\n` bytes) — [messages.py]
 * [ ] Criar estrutura de dados de peers (`PeerTable` e `PeerEntry`)
-* [ ] Corrigir erro de digitação do módulo do Rendezvous (`randezvour_connection.py` ➔ `rendezvous_connection.py`)
-* [ ] Estruturar o projeto nos módulos recomendados pela especificação:
+* [x] Corrigir erro de digitação do módulo do Rendezvous (`randezvour_connection.py` ➔ `rendezvous_connection.py`)
+* [x] Estruturar o projeto nos módulos recomendados pela especificação:
   - `main.py`
   - `p2p_client.py`
   - `rendezvous_connection.py`
@@ -22,7 +22,7 @@ Este documento rastreia o progresso do desenvolvimento do Chat P2P conforme os c
 ---
 
 ## 2. 🛜 Integração com o Servidor Rendezvous
-* [x] Classe de conexão curta de comando único TCP para o Rendezvous — [randezvour_connection.py](file:///home/caldo/Projects/UnB/Redes_Computadores/randezvour_connection.py)
+* [x] Classe de conexão curta de comando único TCP para o Rendezvous — [rendezvous_connection.py]
 * [x] Envio de `REGISTER` de teste
 * [x] Envio de `DISCOVER` de teste
 * [ ] Implementar loop de descoberta recorrente e automática (`DISCOVER`) em background
