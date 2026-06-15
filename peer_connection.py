@@ -1,4 +1,5 @@
 import asyncio
+from typing import Optional
 from message_router import decode_message
 from message_router import encode_message
 
