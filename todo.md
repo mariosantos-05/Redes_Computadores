@@ -5,29 +5,18 @@ Este documento rastreia o progresso do desenvolvimento do Chat P2P conforme os c
 ---
 
 ## 1. 🏗️ Arquitetura de Módulos e Estrutura Geral
-* [x] Criar estrutura básica de mensagens (JSON + `\n` bytes) — [messages.py]
-* [ ] Criar estrutura de dados de peers (`PeerTable` e `PeerEntry`)
-* [x] Corrigir erro de digitação do módulo do Rendezvous (`randezvour_connection.py` ➔ `rendezvous_connection.py`)
-* [x] Estruturar o projeto nos módulos recomendados pela especificação:
-  - `main.py`
-  - `p2p_client.py`
-  - `rendezvous_connection.py`
-  - `peer_connection.py`
-  - `message_router.py`
-  - `keep_alive.py`
-  - `peer_table.py`
-  - `state.py`
-  - `cli.py`
+* [x] Criar estrutura básica de mensagens (JSON + `\n` bytes) — [message_router.py](file:///home/caldo/Projects/Redes_Computadores/message_router.py)
+* [x] Criar estrutura de dados de peers (`PeerTable` e `PeerEntry`) — [peer_table.py](file:///home/caldo/Projects/Redes_Computadores/peer_table.py)
 
 ---
 
 ## 2. 🛜 Integração com o Servidor Rendezvous
-* [x] Classe de conexão curta de comando único TCP para o Rendezvous — [rendezvous_connection.py]
+* [x] Classe de conexão curta de comando único TCP para o Rendezvous — [rendezvous_connection.py](file:///home/caldo/Projects/Redes_Computadores/rendezvous_connection.py)
 * [x] Envio de `REGISTER` de teste
 * [x] Envio de `DISCOVER` de teste
-* [ ] Implementar loop de descoberta recorrente e automática (`DISCOVER`) em background
-* [ ] Implementar atualização periódica do registro no servidor Rendezvous (re-registro antes da expiração do TTL)
-* [ ] Envio de `UNREGISTER` limpo ao encerrar a aplicação
+* [x] Implementar loop de descoberta recorrente e automática (`DISCOVER`) em background
+* [x] Implementar atualização periódica do registro no servidor Rendezvous (re-registro antes da expiração do TTL)
+* [x] Envio de `UNREGISTER` limpo ao encerrar a aplicação
 
 ---
 
@@ -62,7 +51,7 @@ Este documento rastreia o progresso do desenvolvimento do Chat P2P conforme os c
 ## 6. 🔄 Resiliência e Reconexões
 * [ ] Lógica para varrer a `PeerTable` e identificar peers elegíveis para reconexão
 * [ ] Implementar tentativas automáticas de reconexão seguindo a política de **backoff exponencial**
-* [ ] Limitar tentativas a `max_reconnect_attempts` (lido do `config.json` ou padrão) e marcar peers inacessíveis como `STALE`
+* [x] Limitar tentativas a `max_reconnect_attempts` (lido do `config.json` ou padrão) e marcar peers inacessíveis como `STALE`
 
 ---
 
