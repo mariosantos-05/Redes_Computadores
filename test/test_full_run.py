@@ -1,23 +1,22 @@
-import asyncio
+import asyncio 
 import sys
 import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from rendezvous_connection import RendezvousConnection
 from config import Config
+from peer_connection import PeerConnection
+from rendezvous_connection import RendezvousConnection
 
 async def main():
 
     config = Config()
 
-    # Instancia o gerenciador de conexão com o servidor Rendezvous local/remoto de testes
     rdv = RendezvousConnection(
         config.rdv_host, 
         config.rdv_port
     )
 
-    # Mensagem de registro para o servidor Rendezvous
     register_msg = {
         "type": config.type[0],
         "namespace": config.namespace,
@@ -26,28 +25,40 @@ async def main():
         "ttl": config.rdv_ttl
     }
 
-    # Envia a requisição de registro e aguarda a resposta (OK ou ERROR)
+
     response = await rdv.request(
         register_msg
-
     )
-    print("Registration response:", response)
 
 
-    # Mensagem de descoberta para encontrar outros peers ativos no mesmo namespace
     discorver_msg = {
         "type": config.type[1],
         "namespace": config.namespace,
     }
 
-    # Envia a requisição de descoberta e aguarda a resposta contendo a lista de peers ativos
     response = await rdv.request(
         discorver_msg
     )
 
-    # Exibe a lista de peers ativos retornada pelo servidor
-    print("Discovery response:", response)
+    print(response) # Isso aqui já é um dicionário Python, formatado json
+
+    conn = PeerConnection(f"{config.name}@{config.namespace}")
+
+    print("Trying to connect...")
+    for peer in response["peers"]:
+        ip = peer['ip']
+        port = peer['port']
+        name = peer['name']
+        if name != config.name:
+            await conn.connect(ip, port)
+
+            asyncio.create_task(
+                conn.listen()
+            )
+        
+        await asyncio.sleep(100)
+
+    print("Connected!")
 
 
-# Inicia a execução assíncrona do teste
 asyncio.run(main())

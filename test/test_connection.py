@@ -1,7 +1,9 @@
 import asyncio
 import sys
 import os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from peer_connection import PeerConnection
 from config import Config
 
@@ -20,15 +22,16 @@ async def main():
     """
     print("Trying to connect...")
 
+    config = Config()
+
     # Instanciamos o objeto de conexão de saída se identificando com nossa identidade configurada
-    cfg = Config()
-    conn = PeerConnection(f"{cfg.name}@{cfg.namespace}")
+    conn = PeerConnection(f"{config.name}@{config.namespace}")
 
     # 1. Estabelece a conexão TCP e efetua o Handshake inicial (envia HELLO e PING)
     # Espera até que o handshake termine e confirme o sucesso recebendo HELLO_OK
     await conn.connect(
-        cfg.rdv_host,
-        cfg.listen_port
+        config.rdv_host,
+        config.listen_port
     )
 
     # 2. Concorrência Assíncrona com asyncio.create_task:
@@ -40,7 +43,6 @@ async def main():
     asyncio.create_task(
         conn.listen()
     )
-    print("Connected!")
 
     # 3. Manter o programa vivo:
     # Como a tarefa 'listen()' roda em segundo plano, se o nosso script 'main()' terminar agora,
