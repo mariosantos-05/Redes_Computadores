@@ -17,7 +17,7 @@ class PeerConnection:
     """
 
     def __init__(self, peer_id, peer_table=None):
-        # O identificador único do peer local (ex: 'caldo@CIC')
+        # O identificador único do peer local (ex: 'Grupo2@CIC')
         self.peer_id = peer_id
         
         # Tabela de peers compartilhada

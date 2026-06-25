@@ -1,69 +1,67 @@
-# 📝 Lista de Tarefas (To-Do List) — Chat P2P
+# Project Checklist: P2P Chat
 
-Este documento rastreia o progresso do desenvolvimento do Chat P2P conforme os critérios da especificação do projeto.
-
----
-
-## 1. 🏗️ Arquitetura de Módulos e Estrutura Geral
-* [x] Criar estrutura básica de mensagens (JSON + `\n` bytes) — [message_router.py](file:///home/caldo/Projects/Redes_Computadores/message_router.py)
-* [x] Criar estrutura de dados de peers (`PeerTable` e `PeerEntry`) — [peer_table.py](file:///home/caldo/Projects/Redes_Computadores/peer_table.py)
+This document tracks implementation progress against the project requirements specified in the README.md.
 
 ---
 
-## 2. 🛜 Integração com o Servidor Rendezvous
-* [x] Classe de conexão curta de comando único TCP para o Rendezvous — [rendezvous_connection.py](file:///home/caldo/Projects/Redes_Computadores/rendezvous_connection.py)
-* [x] Envio de `REGISTER` de teste
-* [x] Envio de `DISCOVER` de teste
-* [x] Implementar loop de descoberta recorrente e automática (`DISCOVER`) em background
-* [x] Implementar atualização periódica do registro no servidor Rendezvous (re-registro antes da expiração do TTL)
-* [x] Envio de `UNREGISTER` limpo ao encerrar a aplicação
+## 1. Core Structures & Message Routing
+* [x] Basic message framing and serialization (JSON + `\n`) — [message_router.py]
+* [x] Peer tracking data structures (`PeerTable` and `PeerEntry`) — [peer_table.py]
 
 ---
 
-## 3. 🤝 Conexão TCP entre Peers & Keep-Alive
-* [x] Servidor local TCP (`PeerServer`) escutando conexões entrantes
-* [x] Cliente TCP (`PeerConnection`) abrindo conexões de saída
-* [x] Handshake básico estabelecendo conexão (`HELLO` / `HELLO_OK`)
-* [x] Enviar de forma recorrente mensagens de `PING` a cada 30 segundos (intervalo configurável)
-* [x] Tratar recebimento de `PING` e responder com `PONG`
-* [x] Calcular RTT (tempo de resposta) de cada `PING`/`PONG` e salvar média no `PeerEntry`
-* [x] Fechar a conexão de forma limpa em caso de erros de leitura/escrita (timeouts)
+## 2. Rendezvous Server Integration
+* [x] Short-lived connection client for single-command queries — [rendezvous_connection.py]
+* [x] Periodic background registration (`REGISTER` renewal before TTL expiration)
+* [x] Periodic background discovery (`DISCOVER` loop updating local table)
+* [x] Graceful cleanup on program termination (`UNREGISTER`)
 
 ---
 
-## 4. ✉️ Fluxo de Mensageria (Chat)
-* [x] Implementar comando `SEND` para mensagens unicast diretas
-* [x] Tratar mensagens com confirmação (`require_ack`):
-  - Retornar mensagem do tipo `ACK`
-  - Lançar aviso de timeout nos logs caso o `ACK` não chegue em até 5 segundos
-* [x] Implementar comando `PUB` para mensagens de difusão:
-  - Difusão para o Namespace atual (`#namespace`)
-  - Difusão global (`*`) para todos os peers conectados
+## 3. P2P TCP Connection & Keep-Alive
+* [x] Local TCP server (`PeerServer`) to listen for incoming peer connections
+* [x] Outbound TCP client (`PeerConnection`) to initiate connections
+* [x] presentation handshake (`HELLO` / `HELLO_OK`)
+* [x] Periodic `PING` sending and keep-alive verification
+* [x] Receiving `PING` and replying with `PONG`
+* [x] RTT measurement and history averaging saved in `PeerEntry`
+* [x] Connection closing on network timeout or failure
 
 ---
 
-## 5. 🚪 Encerramento Controlado (Sessão)
-* [ ] Enviar comando `BYE` especificando o motivo ao fechar conexões
-* [ ] Responder com `BYE_OK` ao receber um comando `BYE` e fechar o socket de forma ordenada
+## 4. Chat Messaging Flow
+* [x] Unicast direct messaging (`SEND` command)
+* [x] Acknowledgment tracking (`require_ack` with `ACK` response)
+* [x] Timeout handling for lost ACKs (warning logged after 5s)
+* [x] Namespace broadcast (`PUB` with scope `#namespace`)
+* [x] Global broadcast (`PUB` with scope `*`)
 
 ---
 
-## 6. 🔄 Resiliência e Reconexões
-* [x] Lógica para varrer a `PeerTable` e identificar peers elegíveis para reconexão
-* [ ] Implementar tentativas automáticas de reconexão seguindo a política de **backoff exponencial**
-* [x] Limitar tentativas a `max_reconnect_attempts` (lido do `config.json` ou padrão) e marcar peers inacessíveis como `STALE`
+## 5. Controlled Session Termination
+* [ ] Implement outbound `BYE` command detailing termination reason
+* [ ] Implement inbound `BYE_OK` response and orderly socket closure
 
 ---
 
-## 7. 💻 Interface de Usuário (CLI) & Observabilidade
-* [ ] Construir a CLI interativa (`cli.py`) suportando os seguintes comandos:
-  - `/peers [* | #namespace]` (listar/descobrir peers)
-  - `/msg <peer_id> <mensagem>` (mensagem direta)
-  - `/pub * <mensagem>` (broadcast global)
-  - `/pub #<namespace> <mensagem>` (broadcast no namespace)
-  - `/conn` (mostrar conexões ativas inbound/outbound)
-  - `/rtt` (mostrar RTT médio por peer)
-  - `/reconnect` (forçar reconciliação de peers imediatamente)
-  - `/log <Nível>` (ajustar dinamicamente nível de log)
-  - `/quit` (sair e fechar tudo limpo)
-* [ ] Configurar sistema de logging com formatação profissional, enviando registros para a tela e para um arquivo de logs (`p2p.log`).
+## 6. Resilience & Reconnections
+* [x] Peer selection logic for reconnect candidates (ready after backoff)
+* [x] Maximum reconnect threshold (`max_reconnect_attempts`) leading to `STALE` status
+* [ ] Reconnection loop implementation (calling reconnect logic in background task)
+* [ ] Exponential backoff reconciliation scheduling
+
+---
+
+## 7. Interactive CLI & Logging
+* [ ] Interactive CLI loop (`cli.py` or integrated into `main.py`)
+* [ ] Parse and execute CLI commands:
+  - `/peers [* | #namespace]` (discover/list peers)
+  - `/msg <peer_id> <message>` (unicast message)
+  - `/pub * <message>` (global broadcast)
+  - `/pub #<namespace> <message>` (namespace broadcast)
+  - `/conn` (show active TCP connections)
+  - `/rtt` (show average RTT per peer)
+  - `/reconnect` (trigger manual peer reconciliation)
+  - `/log <Level>` (change logging level dynamically)
+  - `/quit` (clean close and exit)
+* [ ] Setup dual-sink logging (stdout / console + persistent file `p2p.log`)
