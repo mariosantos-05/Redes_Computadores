@@ -1,8 +1,12 @@
 import asyncio 
+import logging
 from peer_server import PeerServer
 from peer_table import PeerTable
 from rendezvous_connection import RendezvousConnection
 from config import Config
+from cli import cli_loop
+from logging_config import setup_logger
+from reconnection_manager import reconnection_loop
 
 async def main():
     """
@@ -13,8 +17,14 @@ async def main():
     # Instancia o objeto de configuração
     cfg = Config()
 
-    # 1. Instanciamento da tabela de peers
-    peer_table = PeerTable()
+    # Configura o logger
+    logger = setup_logger(cfg.log_level)
+    logger.info("Starting P2P Chat application...")
+
+    # 1. Instanciamento da tabela de peers e state da aplicação
+    peer_table = PeerTable(max_reconnect_attempts=cfg.max_reconnect_attempts)
+    outbound_connections = {}
+    shutdown_event = asyncio.Event()
 
     # 2. Criação do servidor do Peer local:
     peer_id = f"{cfg.name}@{cfg.namespace}"
@@ -36,18 +46,18 @@ async def main():
         "ttl": cfg.rdv_ttl
     }
     
-    print("[Main] Registrando peer no servidor Rendezvous...")
+    logger.info("Registrando peer no servidor Rendezvous...")
     try:
         response = await rdv_conn.request(register_msg)
         if response.get("status") == "OK":
             granted_ttl = response.get("ttl", cfg.rdv_ttl)
-            print(f"[Main] Registro inicial realizado com sucesso! TTL concedido: {granted_ttl}s")
+            logger.info(f"Registro inicial realizado com sucesso! TTL concedido: {granted_ttl}s")
         else:
-            print(f"[Main] Aviso: Servidor Rendezvous retornou erro no registro: {response.get('message')}")
+            logger.warning(f"Aviso: Servidor Rendezvous retornou erro no registro: {response.get('message')}")
     except Exception as e:
-        print(f"[Main] Aviso: Não foi possível conectar ao Rendezvous para registro inicial: {e}")
+        logger.warning(f"Aviso: Não foi possível conectar ao Rendezvous para registro inicial: {e}")
 
-    # 5. Agendamento dos loops de background (descoberta e re-registro)
+    # 5. Agendamento dos loops de background (descoberta, re-registro, reconexão e CLI)
     reg_task = asyncio.create_task(
         rdv_conn.registration_loop(
             namespace=cfg.namespace,
@@ -61,39 +71,84 @@ async def main():
         rdv_conn.discovery_loop(
             namespace=cfg.namespace,
             peer_table=peer_table,
-            interval=cfg.discover_interval
+            interval=cfg.discover_interval,
+            exclude_peer_id=peer_id
+        )
+    )
+
+    reconn_task = asyncio.create_task(
+        reconnection_loop(
+            peer_id=peer_id,
+            peer_table=peer_table,
+            outbound_connections=outbound_connections
+        )
+    )
+
+    cli_task = asyncio.create_task(
+        cli_loop(
+            peer_id=peer_id,
+            peer_table=peer_table,
+            outbound_connections=outbound_connections,
+            shutdown_event=shutdown_event
         )
     )
 
     # 6. Execução do servidor local TCP com tratamento de saída limpa
+    # Start server explicitly without blocking indefinitely
+    server_runner = await asyncio.start_server(
+        server.handle_client,
+        "0.0.0.0",
+        server.port
+    )
+    logger.info(f"listening on port {server.port}")
+
     try:
-        # Inicializa o socket local do servidor e serve conexões de entrada
-        await server.start()
-    except (asyncio.CancelledError, KeyboardInterrupt):
-        print("\n[Main] Sinal de encerramento recebido.")
+        # Wait until shutdown event is set (e.g. by CLI /quit)
+        await shutdown_event.wait()
+    except asyncio.CancelledError:
+        logger.info("Sinal de encerramento recebido (CancelledError).")
     finally:
-        # Cancelamento das tarefas de background de forma limpa
-        print("[Main] Cancelando tarefas de background...")
+        logger.info("Iniciando encerramento limpo...")
+        
+        # Envia BYE para todas conexões de saída ativas
+        for pid, conn in outbound_connections.items():
+            logger.info(f"Closing outbound connection to {pid}...")
+            await conn.disconnect(reason="Client shutting down")
+            await conn.close()
+
+        # Cancela loops
         reg_task.cancel()
         disc_task.cancel()
+        reconn_task.cancel()
+        cli_task.cancel()
         
-        # Aguarda o cancelamento das tarefas se encerrarem
-        await asyncio.gather(reg_task, disc_task, return_exceptions=True)
+        await asyncio.gather(reg_task, disc_task, reconn_task, cli_task, return_exceptions=True)
 
-        # Envio de UNREGISTER ao servidor Rendezvous para remover nossa presença da lista ativa
+        # Para o servidor TCP
+        server_runner.close()
+        for task in list(server.active_tasks):
+            task.cancel()
+        for w in list(server.active_connections):
+            try:
+                w.close()
+            except Exception:
+                pass
+        await server_runner.wait_closed()
+
+        # Envio de UNREGISTER
         try:
             await rdv_conn.unregister(
                 namespace=cfg.namespace,
                 name=cfg.name,
                 port=port
             )
-            print("[Main] Remoção de registro (UNREGISTER) concluída com sucesso.")
+            logger.info("Remoção de registro (UNREGISTER) concluída com sucesso.")
         except Exception as e:
-            print(f"[Main] Erro ao tentar remover registro (UNREGISTER): {e}")
+            logger.error(f"Erro ao tentar remover registro (UNREGISTER): {e}")
 
-# Inicialização do Loop de Eventos com captura amigável de KeyboardInterrupt externo
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n[Main] Aplicação encerrada de forma amigável pelo usuário.")
+        pass
+    print("\n[Main] Aplicação encerrada.")

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Optional
 from peer_table import PeerTable
 # Nota Importante: O import 'writer' do módulo csv não é utilizado neste arquivo. Ele provavelmente 
@@ -74,7 +75,7 @@ class PeerServer:
                 # se identificar. O peer que iniciou a chamada envia um "HELLO".
                 if msg.get("type") == "HELLO":
                     remote_peer = msg.get("peer_id")
-                    print(f"Received HELLO from {remote_peer}")
+                    logging.getLogger(__name__).info(f"Received HELLO from {remote_peer}")
 
                     # Criamos a mensagem de sucesso (HELLO_OK) contendo nossa própria identidade
                     response = {
@@ -100,7 +101,7 @@ class PeerServer:
                 # Periodicamente (a cada 30 segundos), o cliente de outro peer vai te enviar um "PING" para ver se 
                 # seu servidor ainda está vivo e medir o tempo de ida e volta (RTT).
                 elif msg.get("type") == "PING":
-                    print(f"PING RECEIVED from {remote_peer or 'unknown'}")
+                    logging.getLogger(__name__).debug(f"PING RECEIVED from {remote_peer or 'unknown'}")
 
                     # Prepara a mensagem de resposta correspondente
                     pong = {
@@ -113,7 +114,7 @@ class PeerServer:
                     )
                     # Força a transmissão física para garantir medição de RTT precisa no cliente
                     await writer.drain()
-                    print(f"PONG SENT to {remote_peer or 'unknown'}")
+                    logging.getLogger(__name__).debug(f"PONG SENT to {remote_peer or 'unknown'}")
 
                 # 6. Trata mensagens unicast (SEND):
                 # Outro peer enviou uma mensagem direta para este nó. Imprimimos o conteúdo e,
@@ -123,7 +124,7 @@ class PeerServer:
                     sender  = msg.get("src", remote_peer or "unknown")
                     content = msg.get("payload", "")
                     msg_id  = msg.get("msg_id")
-                    print(f"[SEND] {sender}: {content}")
+                    print(f"\n[SEND] {sender}: {content}\np2p> ", end="", flush=True)
                     self.received_messages.append(msg)
 
                     if msg.get("require_ack") and msg_id:
@@ -137,7 +138,7 @@ class PeerServer:
                         }
                         writer.write(encode_message(ack))
                         await writer.drain()
-                        print(f"[ACK] Sent ACK for msg_id={msg_id} to {sender}")
+                        logging.getLogger(__name__).debug(f"[ACK] Sent ACK for msg_id={msg_id} to {sender}")
 
                 # 7. Trata mensagens de difusão (PUB):
                 # Outro peer enviou uma mensagem de broadcast. O campo 'dst' indica o escopo:
@@ -146,11 +147,22 @@ class PeerServer:
                     sender  = msg.get("src", remote_peer or "unknown")
                     content = msg.get("payload", "")
                     scope   = msg.get("dst", "*")
-                    print(f"[PUB] [{scope}] {sender}: {content}")
+                    print(f"\n[PUB] [{scope}] {sender}: {content}\np2p> ", end="", flush=True)
                     self.received_messages.append(msg)
 
+                elif msg.get("type") == "BYE":
+                    reason = msg.get("reason", "No reason provided")
+                    logging.getLogger(__name__).info(f"Received BYE from {remote_peer or 'unknown'}: {reason}")
+                    
+                    bye_ok = {
+                        "type": "BYE_OK"
+                    }
+                    writer.write(encode_message(bye_ok))
+                    await writer.drain()
+                    break
+
         except Exception as e:
-            print(f"Server error handling client {remote_peer or 'unknown'}: {e}")
+            logging.getLogger(__name__).error(f"Server error handling client {remote_peer or 'unknown'}: {e}")
         finally:
             self.active_connections.discard(writer)
             current_task = asyncio.current_task()
@@ -162,7 +174,7 @@ class PeerServer:
                 await writer.wait_closed()
             except Exception:
                 pass
-            print(f"Connection with client {remote_peer or 'unknown'} closed")
+            logging.getLogger(__name__).info(f"Connection with client {remote_peer or 'unknown'} closed")
 
             # Atualiza o status do peer na tabela se ele estava conectado
             if self.peer_table and remote_peer:
@@ -186,7 +198,7 @@ class PeerServer:
             self.port
         )
 
-        print(f"listening on port {self.port}")
+        logging.getLogger(__name__).info(f"listening on port {self.port}")
     
         try:
             # Mantém o loop de eventos focado em servir o socket deste servidor para sempre,
@@ -194,7 +206,7 @@ class PeerServer:
             await asyncio.Event().wait()
         finally:
             server.close()
-            print(f"[PeerServer] Stopping server on port {self.port}, cancelling {len(self.active_tasks)} active client tasks...")
+            logging.getLogger(__name__).info(f"[PeerServer] Stopping server on port {self.port}, cancelling {len(self.active_tasks)} active client tasks...")
             for task in list(self.active_tasks):
                 task.cancel()
             for w in list(self.active_connections):

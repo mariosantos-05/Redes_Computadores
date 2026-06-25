@@ -39,22 +39,22 @@ This document tracks implementation progress against the project requirements sp
 ---
 
 ## 5. Controlled Session Termination
-* [ ] Implement outbound `BYE` command detailing termination reason
-* [ ] Implement inbound `BYE_OK` response and orderly socket closure
+* [x] Implement outbound `BYE` command detailing termination reason
+* [x] Implement inbound `BYE_OK` response and orderly socket closure
 
 ---
 
 ## 6. Resilience & Reconnections
 * [x] Peer selection logic for reconnect candidates (ready after backoff)
 * [x] Maximum reconnect threshold (`max_reconnect_attempts`) leading to `STALE` status
-* [ ] Reconnection loop implementation (calling reconnect logic in background task)
-* [ ] Exponential backoff reconciliation scheduling
+* [x] Reconnection loop implementation (calling reconnect logic in background task)
+* [x] Exponential backoff reconciliation scheduling
 
 ---
 
 ## 7. Interactive CLI & Logging
-* [ ] Interactive CLI loop (`cli.py` or integrated into `main.py`)
-* [ ] Parse and execute CLI commands:
+* [x] Interactive CLI loop (`cli.py` or integrated into `main.py`)
+* [x] Parse and execute CLI commands:
   - `/peers [* | #namespace]` (discover/list peers)
   - `/msg <peer_id> <message>` (unicast message)
   - `/pub * <message>` (global broadcast)
@@ -64,4 +64,4 @@ This document tracks implementation progress against the project requirements sp
   - `/reconnect` (trigger manual peer reconciliation)
   - `/log <Level>` (change logging level dynamically)
   - `/quit` (clean close and exit)
-* [ ] Setup dual-sink logging (stdout / console + persistent file `p2p.log`)
+* [x] Setup dual-sink logging (stdout / console + persistent file `p2p.log`)

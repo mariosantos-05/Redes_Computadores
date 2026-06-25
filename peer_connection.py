@@ -1,5 +1,6 @@
 import asyncio
 import time
+import logging
 from typing import Optional, Dict
 from message_router import decode_message
 from message_router import encode_message
@@ -77,13 +78,13 @@ class PeerConnection:
                         timeout=self.keepalive_interval * 2
                     )
                 except asyncio.TimeoutError:
-                    print(f"Connection timeout with {self.remote_peer_id}")
+                    logging.getLogger(__name__).warning(f"Connection timeout with {self.remote_peer_id}")
                     break
         
                 # Se 'data' for vazio, o peer remoto fechou a conexão de forma limpa.
                 # Encerramos o loop imediatamente.
                 if not data:
-                    print(f"Connection closed by remote peer: {self.remote_peer_id}")
+                    logging.getLogger(__name__).info(f"Connection closed by remote peer: {self.remote_peer_id}")
                     break
                 
                 # Desserializa os bytes binários para um dicionário JSON legível do Python
@@ -93,26 +94,36 @@ class PeerConnection:
                 if msg.get("type") == "PONG":
                     if self.last_ping_time is not None:
                         rtt_ms = (time.time() - self.last_ping_time) * 1000
-                        print(f"[RTT] Measured RTT to {self.remote_peer_id}: {rtt_ms:.2f} ms")
+                        logging.getLogger(__name__).debug(f"[RTT] Measured RTT to {self.remote_peer_id}: {rtt_ms:.2f} ms")
                         if self.peer_table and self.remote_peer_id:
                             peer_entry = self.peer_table.get_peer(self.remote_peer_id)
                             if peer_entry:
                                 peer_entry.add_rtt(rtt_ms)
 
-                # Processamento de ACK: sinaliza o Event pendente para liberar o send_message
                 elif msg.get("type") == "ACK":
                     msg_id = msg.get("msg_id")
                     if msg_id and msg_id in self._pending_acks:
                         self._pending_acks[msg_id].set()
-                        print(f"[ACK] Received ACK for msg_id={msg_id} from {self.remote_peer_id}")
+                        logging.getLogger(__name__).debug(f"[ACK] Received ACK for msg_id={msg_id} from {self.remote_peer_id}")
                     else:
-                        print(f"[ACK] Received unexpected ACK (msg_id={msg_id}) from {self.remote_peer_id}")
+                        logging.getLogger(__name__).debug(f"[ACK] Received unexpected ACK (msg_id={msg_id}) from {self.remote_peer_id}")
+
+                elif msg.get("type") == "BYE":
+                    reason = msg.get("reason", "No reason provided")
+                    logging.getLogger(__name__).info(f"Received BYE from {self.remote_peer_id}: {reason}")
+                    bye_ok = {"type": "BYE_OK"}
+                    await self.send(bye_ok)
+                    break
+
+                elif msg.get("type") == "BYE_OK":
+                    logging.getLogger(__name__).info(f"Received BYE_OK from {self.remote_peer_id}")
+                    break
 
                 else:
                     # Exibe no terminal qualquer outra mensagem estruturada recebida
-                    print("Received:", msg)
+                    logging.getLogger(__name__).info(f"Received structured msg: {msg}")
         except Exception as e:
-            print(f"Connection error with {self.remote_peer_id}: {e}")
+            logging.getLogger(__name__).error(f"Connection error with {self.remote_peer_id}: {e}")
         finally:
             await self.close()
             if self.peer_table and self.remote_peer_id:
@@ -140,7 +151,7 @@ class PeerConnection:
             port
         )
 
-        print("TCP connection established")
+        logging.getLogger(__name__).info("TCP connection established")
 
         # Prepara a mensagem de identificação 'HELLO' conforme os padrões do protocolo
         hello_msg = {
@@ -170,7 +181,7 @@ class PeerConnection:
         # Aguarda a transmissão física de ambos os pacotes
         await self.writer.drain()
 
-        print("HELLO sent")
+        logging.getLogger(__name__).debug("HELLO sent")
     
         # O programa fica pausado de forma assíncrona aguardando a resposta do peer remoto
         data = await self.reader.readline()
@@ -178,7 +189,7 @@ class PeerConnection:
         # Converte a resposta em dicionário Python
         msg = decode_message(data)
         
-        print(msg)
+        logging.getLogger(__name__).debug(f"Handshake response: {msg}")
     
         # Validação do Handshake:
         # Se o peer remoto responder com qualquer coisa diferente de HELLO_OK,
@@ -191,7 +202,7 @@ class PeerConnection:
         # Salva o identificador (ex: 'bob@CIC') que o peer remoto informou no seu HELLO_OK
         self.remote_peer_id = msg["peer_id"]
     
-        print(f"Connected to {self.remote_peer_id}")
+        logging.getLogger(__name__).info(f"Connected to {self.remote_peer_id}")
 
         # Se a tabela de peers existe, marca como conectado
         if self.peer_table:
@@ -232,13 +243,13 @@ class PeerConnection:
             self._pending_acks[msg_id] = ack_event
 
         await self.send(msg)
-        print(f"[SEND] Message sent to {self.remote_peer_id} (msg_id={msg_id}, require_ack={require_ack})")
+        logging.getLogger(__name__).debug(f"[SEND] Message sent to {self.remote_peer_id} (msg_id={msg_id}, require_ack={require_ack})")
 
         if require_ack:
             try:
                 await asyncio.wait_for(ack_event.wait(), timeout=self.ack_timeout)
             except asyncio.TimeoutError:
-                print(
+                logging.getLogger(__name__).warning(
                     f"[ACK] WARNING: No ACK received from {self.remote_peer_id} "
                     f"for msg_id={msg_id} within {self.ack_timeout}s"
                 )
@@ -273,7 +284,7 @@ class PeerConnection:
             "ttl": 1
         }
         await self.send(msg)
-        print(f"[PUB] Broadcast sent to {self.remote_peer_id} (scope={scope}, msg_id={msg_id})")
+        logging.getLogger(__name__).debug(f"[PUB] Broadcast sent to {self.remote_peer_id} (scope={scope}, msg_id={msg_id})")
 
     async def keepalive_loop(self):
         """
@@ -291,11 +302,25 @@ class PeerConnection:
                 }
                 self.last_ping_time = time.time()
                 await self.send(ping_msg)
-                print(f"[KeepAlive] Sent PING to {self.remote_peer_id}")
+                logging.getLogger(__name__).debug(f"[KeepAlive] Sent PING to {self.remote_peer_id}")
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            print(f"[KeepAlive] Error sending PING to {self.remote_peer_id}: {e}")
+            logging.getLogger(__name__).error(f"[KeepAlive] Error sending PING to {self.remote_peer_id}: {e}")
+
+    async def disconnect(self, reason: str = "Client closing connection"):
+        """
+        Envia uma mensagem de BYE para fechar a conexão de forma limpa.
+        """
+        bye_msg = {
+            "type": "BYE",
+            "reason": reason
+        }
+        try:
+            await self.send(bye_msg)
+            logging.getLogger(__name__).debug(f"[BYE] Sent to {self.remote_peer_id} with reason: {reason}")
+        except Exception as e:
+            logging.getLogger(__name__).error(f"[BYE] Failed to send BYE to {self.remote_peer_id}: {e}")
 
     async def close(self):
         """
