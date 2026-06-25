@@ -146,9 +146,9 @@ class PeerConnection:
         5. Salva a identidade confirmada do peer remoto.
         """
         # Abre a conexão TCP de forma assíncrona. Retorna o leitor e o escritor do socket.
-        self.reader, self.writer = await asyncio.open_connection(
-            host,
-            port
+        self.reader, self.writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port),
+            timeout=5.0
         )
 
         logging.getLogger(__name__).info("TCP connection established")
@@ -184,7 +184,7 @@ class PeerConnection:
         logging.getLogger(__name__).debug("HELLO sent")
     
         # O programa fica pausado de forma assíncrona aguardando a resposta do peer remoto
-        data = await self.reader.readline()
+        data = await asyncio.wait_for(self.reader.readline(), timeout=5.0)
         
         # Converte a resposta em dicionário Python
         msg = decode_message(data)

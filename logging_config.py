@@ -1,5 +1,22 @@
 import logging
 import sys
+import readline
+
+class ReadlineConsoleHandler(logging.StreamHandler):
+    cli_active = False
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            if ReadlineConsoleHandler.cli_active:
+                sys.stdout.write('\r\x1b[K')
+                sys.stdout.write(msg + '\n')
+                sys.stdout.write('p2p> ' + (readline.get_line_buffer() or ''))
+            else:
+                sys.stdout.write(msg + '\n')
+            sys.stdout.flush()
+        except Exception:
+            self.handleError(record)
 
 def setup_logger(level_name: str = "INFO") -> logging.Logger:
     """
@@ -21,7 +38,7 @@ def setup_logger(level_name: str = "INFO") -> logging.Logger:
     )
 
     # Console Handler (stdout)
-    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler = ReadlineConsoleHandler(sys.stdout)
     console_handler.setLevel(numeric_level)
     console_handler.setFormatter(formatter)
     

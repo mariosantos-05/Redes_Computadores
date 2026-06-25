@@ -13,6 +13,8 @@ async def async_input(prompt: str) -> str:
     # input() automatically uses readline and handles prompt
     return await loop.run_in_executor(None, input, prompt)
 
+from logging_config import ReadlineConsoleHandler
+
 async def cli_loop(
     peer_id: str,
     peer_table: PeerTable,
@@ -24,6 +26,8 @@ async def cli_loop(
     """
     logger = logging.getLogger(__name__)
     await asyncio.sleep(1.0) # Wait for initial logs
+
+    ReadlineConsoleHandler.cli_active = True
 
     while not shutdown_event.is_set():
         try:
@@ -185,3 +189,5 @@ async def cli_loop(
         except Exception as e:
             logger.error(f"CLI error: {e}")
             break
+            
+    ReadlineConsoleHandler.cli_active = False
