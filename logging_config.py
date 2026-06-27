@@ -16,8 +16,16 @@ import logging
 import sys
 import readline
 
-class ReadlineConsoleHandler(logging.StreamHandler):
-    cli_active = False
+class ReadlineConsoleHandler(logging.Handler):
+    """
+    Handler customizado de Logging que gerencia a impressão de logs em segundo plano
+    sem quebrar o prompt visual do usuário gerado pelo 'readline' na CLI.
+    
+    Quando a CLI está ativa aguardando input (cli_active = True), este handler apaga
+    a linha atual, imprime o log de rede e então recria o prompt 'p2p> ' e o que
+    o usuário já havia digitado, criando a ilusão de um chat sem interrupções.
+    """
+    cli_active = False # Flag controlada pelo cli.py para saber se estamos no prompt
 
     def emit(self, record):
         try:
@@ -34,25 +42,26 @@ class ReadlineConsoleHandler(logging.StreamHandler):
 
 def setup_logger(level_name: str = "INFO") -> logging.Logger:
     """
-    Configures a root logger with dual sinks: stdout and a file.
+    Configura o sistema global de logs da aplicação.
+    Usa um formato padronizado com timestamp local, nível do log e mensagem.
     """
     numeric_level = getattr(logging, level_name.upper(), logging.INFO)
     
     logger = logging.getLogger()
     logger.setLevel(numeric_level)
 
-    # Clear existing handlers if any
+    # Remove qualquer handler padrão que o Python tenha colocado
     if logger.hasHandlers():
         logger.handlers.clear()
 
-    # Formatter
+    # Formatação das mensagens: Data Hora | NÍVEL | Mensagem
     formatter = logging.Formatter(
         fmt='%(asctime)s | %(levelname)-8s | %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-    # Console Handler (stdout)
-    console_handler = ReadlineConsoleHandler(sys.stdout)
+    # Acopla nosso Handler customizado para lidar com a CLI
+    console_handler = ReadlineConsoleHandler()
     console_handler.setLevel(numeric_level)
     console_handler.setFormatter(formatter)
     

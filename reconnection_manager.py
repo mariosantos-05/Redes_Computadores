@@ -25,8 +25,9 @@ async def reconnection_loop(
     interval: int = 5
 ):
     """
-    Periodically checks for peers in RECONNECTING state that have passed their
-    backoff time, and attempts to reconnect.
+    Loop em segundo plano que verifica periodicamente se existem peers no estado
+    'RECONNECTING' cujo tempo de penalidade (backoff) já expirou, e então tenta
+    estabelecer uma nova conexão TCP de forma autônoma.
     """
     logger = logging.getLogger(__name__)
     try:
@@ -35,20 +36,21 @@ async def reconnection_loop(
             candidates = peer_table.get_peers_to_reconnect()
             
             for peer in candidates:
-                logger.info(f"[Reconnect] Attempting to reconnect to {peer.peer_id} at {peer.ip}:{peer.port}")
+                logger.info(f"[Reconnect] Tentando reconectar automaticamente a {peer.peer_id} em {peer.ip}:{peer.port}")
                 
-                # Create a new connection
+                # Cria uma nova instância de conexão
                 conn = PeerConnection(peer_id, peer_table)
                 try:
                     await conn.connect(peer.ip, peer.port)
-                    # Start listening
+                    # Inicia a escuta contínua de mensagens
                     listen_task = asyncio.create_task(conn.listen())
                     
-                    # Store the connection
+                    # Armazena a nova conexão ativa
                     outbound_connections[peer.peer_id] = conn
-                    logger.info(f"[Reconnect] Successfully reconnected to {peer.peer_id}")
+                    logger.info(f"[Reconnect] Reconectado com sucesso a {peer.peer_id}")
                 except Exception as e:
-                    logger.warning(f"[Reconnect] Failed to reconnect to {peer.peer_id}: {e}")
+                    logger.warning(f"[Reconnect] Falha ao reconectar a {peer.peer_id}: {e}")
+                    # Registra a falha, o que incrementará o contador e aumentará o tempo do próximo backoff exponencial
                     peer_table.mark_failed_attempt(peer.peer_id)
                     
     except asyncio.CancelledError:

@@ -15,34 +15,64 @@
 import json
 import sys
 import os
+import uuid
+from pathlib import Path
 
 class Config:
-    def __init__(self, filepath=None):
-        if filepath is None:
-            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-        self.filepath = filepath
-        self.load_config()
-    def load_config(self):
+    """
+    Classe Singleton para carregar e fornecer configurações do arquivo config.json.
+    Garante que os arquivos de metadados do projeto sejam lidos uma única vez
+    na inicialização e compartilhados entre todos os módulos.
+    """
+    _instance = None
+
+    def __new__(cls):
+        # Implementação clássica de um Singleton: se a instância não existir, cria-a
+        if cls._instance is None:
+            cls._instance = super(Config, cls).__new__(cls)
+            cls._instance._load_config()
+        return cls._instance
+
+    def _load_config(self):
+        """Lê o arquivo config.json e extrai as variáveis de ambiente."""
+        config_path = Path(__file__).parent / 'config.json'
+        
         try:
-            with open(self.filepath, "r") as file:
-                self.data = json.load(file)
-        except Exception as error:
-            print(f"Warning: Could not load {self.filepath}, using default values. Error: {error}", file=sys.stderr)
-            self.data = {}
-        self.app_name = self.data.get("app_name", "pyp2p-chat")
-        self.rdv_host = self.data.get("rdv_host", "rdv.mfcaetano.cc")
-        self.rdv_port = self.data.get("rdv_port", 8080)
-        self.listen_host = self.data.get("listen_host", "0.0.0.0")
-        self.listen_port = self.data.get("listen_port", 8081)
-        self.tcp_port = self.data.get("tcp_port", 5000)
-        self.discover_interval = self.data.get("discover_interval", 20)
-        self.keepalive_interval = self.data.get("keepalive_interval", 30)
-        self.rdv_ttl = self.data.get("rdv_ttl", 3600)
-        self.fixed_msg_ttl = self.data.get("fixed_msg_ttl", 1)
-        self.namespace = self.data.get("namespace", "CIC")
-        self.name = self.data.get("name", "Grupo_2")
-        self.type = self.data.get("type", ["REGISTER", "DISCOVER"])
-        self.log_level = self.data.get("log_level", "INFO")
-        self.features = self.data.get("features", ["ack", "metrics"])
-        self.autonomous_mode = self.data.get("autonomous_mode", False)
-        self.max_reconnect_attempts = self.data.get("max_reconnect_attempts", 5)
+            with open(config_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            # Identificação do nó
+            self.namespace = data.get("namespace", "Default")
+            self.name = data.get("name", f"peer_{uuid.uuid4().hex[:4]}")
+            self.peer_id = f"{self.name}@{self.namespace}"
+            
+            # Endereço e Porta do Rendezvous (Servidor Central de Descoberta)
+            rdv = data.get("rendezvous", {})
+            self.rdv_host = rdv.get("host", "45.171.101.167")
+            self.rdv_port = int(rdv.get("port", 8080))
+            
+            # Configurações do servidor local (porta em que este nó vai escutar conexões)
+            server = data.get("server", {})
+            self.listen_port = int(server.get("port", 0)) # 0 significa escolher uma porta livre dinamicamente
+            
+            # Protocolo (Metadados do Handshake)
+            protocol = data.get("protocol", {})
+            self.version = protocol.get("version", "1.0")
+            self.features = protocol.get("features", ["ack"])
+            self.fixed_msg_ttl = protocol.get("fixed_msg_ttl", 1)
+            
+            # Tempos de reconexão e TTL do Servidor
+            reconnect = data.get("reconnect", {})
+            self.max_reconnect_attempts = int(reconnect.get("max_reconnect_attempts", 5))
+            self.rdv_ttl = int(reconnect.get("rdv_ttl", 3600))
+            
+            # Parâmetros adicionais
+            self.log_level = data.get("log_level", "INFO")
+            self.autonomous_mode = data.get("autonomous_mode", False)
+            self.discover_interval = data.get("discover_interval", 20)
+            self.keepalive_interval = data.get("keepalive_interval", 30)
+            
+        except Exception as e:
+            # Em caso de falha severa na leitura do JSON, avisa e encerra o sistema
+            print(f"Erro fatal ao carregar config.json: {e}")
+            sys.exit(1)

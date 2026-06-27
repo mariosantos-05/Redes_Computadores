@@ -16,8 +16,12 @@ import asyncio
 import time
 import logging
 from typing import Optional, Dict
-from message_router import decode_message
-from message_router import encode_message
+from message_router import decode_message, encode_message, process_common_messages
+from config import Config
+import uuid
+import datetime
+import sys
+import readline
 
 class PeerConnection:
     """
@@ -104,7 +108,13 @@ class PeerConnection:
                 # Desserializa os bytes binários para um dicionário JSON legível do Python
                 msg = decode_message(data)
         
-                # Processamento de Keep-Alive
+                action = await process_common_messages(msg, self.peer_id, self.remote_peer_id, self.send)
+                if action == "BREAK":
+                    break
+                elif action == "HANDLED":
+                    continue
+
+                # Processamento de Keep-Alive e confirmações (Específico do Cliente)
                 if msg.get("type") == "PONG":
                     if self.last_ping_time is not None:
                         rtt_ms = (time.time() - self.last_ping_time) * 1000
@@ -122,20 +132,13 @@ class PeerConnection:
                     else:
                         logging.getLogger(__name__).debug(f"[ACK] Received unexpected ACK (msg_id={msg_id}) from {self.remote_peer_id}")
 
-                elif msg.get("type") == "BYE":
-                    reason = msg.get("reason", "No reason provided")
-                    logging.getLogger(__name__).info(f"Received BYE from {self.remote_peer_id}: {reason}")
-                    bye_ok = {"type": "BYE_OK"}
-                    await self.send(bye_ok)
-                    break
-
                 elif msg.get("type") == "BYE_OK":
                     logging.getLogger(__name__).info(f"Received BYE_OK from {self.remote_peer_id}")
                     break
 
                 else:
                     # Exibe no terminal qualquer outra mensagem estruturada recebida
-                    logging.getLogger(__name__).info(f"Received structured msg: {msg}")
+                    logging.getLogger(__name__).info(f"Received unknown structured msg: {msg}")
         except Exception as e:
             logging.getLogger(__name__).error(f"Connection error with {self.remote_peer_id}: {e}")
         finally:
@@ -172,17 +175,16 @@ class PeerConnection:
             "type": "HELLO",
             "peer_id": self.peer_id,
             "version": "1.0",
-            "features": [],
-            "ttl": 1
+            "features": Config().features,
+            "ttl": Config().fixed_msg_ttl
         }
 
         # Prepara uma mensagem inicial de PING de keep-alive
         ping_msg = {
             "type": "PING",
-            "peer_id": self.peer_id,
-            "version": "1.0",
-            "features": [],
-            "ttl": 1
+            "msg_id": str(uuid.uuid4()),
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "ttl": Config().fixed_msg_ttl
         }
     
         # Envia a apresentação (HELLO)
@@ -248,7 +250,7 @@ class PeerConnection:
             "dst": self.remote_peer_id,
             "payload": content,
             "require_ack": require_ack,
-            "ttl": 1
+            "ttl": Config().fixed_msg_ttl
         }
 
         if require_ack:
@@ -295,7 +297,7 @@ class PeerConnection:
             "dst": scope,
             "payload": content,
             "require_ack": False,
-            "ttl": 1
+            "ttl": Config().fixed_msg_ttl
         }
         await self.send(msg)
         logging.getLogger(__name__).debug(f"[PUB] Broadcast sent to {self.remote_peer_id} (scope={scope}, msg_id={msg_id})")
@@ -309,10 +311,9 @@ class PeerConnection:
                 await asyncio.sleep(self.keepalive_interval)
                 ping_msg = {
                     "type": "PING",
-                    "peer_id": self.peer_id,
-                    "version": "1.0",
-                    "features": [],
-                    "ttl": 1
+                    "msg_id": str(uuid.uuid4()),
+                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                    "ttl": Config().fixed_msg_ttl
                 }
                 self.last_ping_time = time.time()
                 await self.send(ping_msg)
@@ -328,7 +329,11 @@ class PeerConnection:
         """
         bye_msg = {
             "type": "BYE",
-            "reason": reason
+            "msg_id": str(uuid.uuid4()),
+            "src": self.peer_id,
+            "dst": self.remote_peer_id,
+            "reason": reason,
+            "ttl": Config().fixed_msg_ttl
         }
         try:
             await self.send(bye_msg)

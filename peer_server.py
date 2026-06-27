@@ -19,9 +19,12 @@ from peer_table import PeerTable
 # Nota Importante: O import 'writer' do módulo csv não é utilizado neste arquivo. Ele provavelmente 
 # foi importado por engano no lugar do StreamWriter do asyncio. Mantemos aqui por questões de compatibilidade
 # com o rascunho inicial do usuário, mas adicionamos esse alerta.
-from csv import writer
-from message_router import decode_message
-from message_router import encode_message
+from message_router import decode_message, encode_message, process_common_messages
+from config import Config
+import uuid
+import datetime
+import sys
+import readline
 
 class PeerServer:
     """
@@ -83,97 +86,43 @@ class PeerServer:
                 # Traduz os bytes recebidos para um dicionário Python contendo os campos da especificação do protocolo.
                 msg = decode_message(data)
                 
-
-                # 4. Trata o handshake inicial (HELLO):
-                # De acordo com a especificação, antes de trocar mensagens normais de chat, as duas pontas precisam
-                # se identificar. O peer que iniciou a chamada envia um "HELLO".
-                if msg.get("type") == "HELLO":
-                    remote_peer = msg.get("peer_id")
-                    logging.getLogger(__name__).info(f"Received HELLO from {remote_peer}")
-
-                    # Criamos a mensagem de sucesso (HELLO_OK) contendo nossa própria identidade
-                    response = {
-                        "type": "HELLO_OK",
-                        "peer_id": self.peer_id
-                    }
-
-                    # Escreve a resposta codificada em JSON + bytes no buffer de saída do socket
-                    writer.write(
-                        encode_message(response)
-                    )
-                    # O 'writer.write' apenas coloca os dados no buffer local do Python.
-                    # Precisamos usar 'await writer.drain()' para forçar o envio físico dos bytes pela rede,
-                    # pausando esta tarefa de forma assíncrona até que o envio termine.
+                # Trata mensagens comuns (PING, SEND, PUB, BYE) usando o router
+                async def send_wrapper(data):
+                    writer.write(encode_message(data))
                     await writer.drain()
 
-                    # Atualiza a tabela de peers para marcar como conectado
-                    if self.peer_table and remote_peer:
-                        self.peer_table.mark_connected(remote_peer)
-
+                action = await process_common_messages(msg, self.peer_id, remote_peer, send_wrapper)
                 
-                # 5. Trata mensagens de Keep-Alive (PING):
-                # Periodicamente (a cada 30 segundos), o cliente de outro peer vai te enviar um "PING" para ver se 
-                # seu servidor ainda está vivo e medir o tempo de ida e volta (RTT).
-                elif msg.get("type") == "PING":
-                    logging.getLogger(__name__).debug(f"PING RECEIVED from {remote_peer or 'unknown'}")
-
-                    # Prepara a mensagem de resposta correspondente
-                    pong = {
-                        "type": "PONG",
-                    }
-
-                    # Escreve o PONG no buffer do socket
-                    writer.write(
-                        encode_message(pong)
-                    )
-                    # Força a transmissão física para garantir medição de RTT precisa no cliente
-                    await writer.drain()
-                    logging.getLogger(__name__).debug(f"PONG SENT to {remote_peer or 'unknown'}")
-
-                # 6. Trata mensagens unicast (SEND):
-                # Outro peer enviou uma mensagem direta para este nó. Imprimimos o conteúdo e,
-                # se o campo 'require_ack' estiver ativo, respondemos com um ACK para confirmar
-                # o recebimento ao remetente.
-                elif msg.get("type") == "SEND":
-                    sender  = msg.get("src", remote_peer or "unknown")
-                    content = msg.get("payload", "")
-                    msg_id  = msg.get("msg_id")
-                    print(f"\n[SEND] {sender}: {content}\np2p> ", end="", flush=True)
-                    self.received_messages.append(msg)
-
-                    if msg.get("require_ack") and msg_id:
-                        import datetime
-                        timestamp = datetime.datetime.utcnow().isoformat() + "Z"
-                        ack = {
-                            "type": "ACK",
-                            "msg_id": msg_id,
-                            "timestamp": timestamp,
-                            "ttl": 1
-                        }
-                        writer.write(encode_message(ack))
-                        await writer.drain()
-                        logging.getLogger(__name__).debug(f"[ACK] Sent ACK for msg_id={msg_id} to {sender}")
-
-                # 7. Trata mensagens de difusão (PUB):
-                # Outro peer enviou uma mensagem de broadcast. O campo 'dst' indica o escopo:
-                # '#namespace' para difusão no namespace atual ou '*' para difusão global.
-                elif msg.get("type") == "PUB":
-                    sender  = msg.get("src", remote_peer or "unknown")
-                    content = msg.get("payload", "")
-                    scope   = msg.get("dst", "*")
-                    print(f"\n[PUB] [{scope}] {sender}: {content}\np2p> ", end="", flush=True)
-                    self.received_messages.append(msg)
-
-                elif msg.get("type") == "BYE":
-                    reason = msg.get("reason", "No reason provided")
-                    logging.getLogger(__name__).info(f"Received BYE from {remote_peer or 'unknown'}: {reason}")
-                    
-                    bye_ok = {
-                        "type": "BYE_OK"
-                    }
-                    writer.write(encode_message(bye_ok))
-                    await writer.drain()
+                if action == "BREAK":
                     break
+                elif action == "HANDLED":
+                    # Opcional: manter log de mensagens recebidas no servidor
+                    if msg.get("type") in ["SEND", "PUB"]:
+                        self.received_messages.append(msg)
+                    continue
+
+                # Processamento específico do Servidor (HELLO)
+                if msg.get("type") == "HELLO":
+                    remote_peer = msg.get("peer_id", "unknown")
+                    remote_addr = writer.get_extra_info('peername')
+                    logging.getLogger(__name__).info(f"[PeerServer] Inbound connected: {remote_peer} from {remote_addr}")
+
+                    # Se estiver usando uma tabela de peers, registra o peer entrante
+                    if self.peer_table:
+                        self.peer_table.update_peer(remote_peer, remote_addr[0], remote_addr[1], msg.get("ttl", 3600))
+                    
+                    hello_ok = {
+                        "type": "HELLO_OK",
+                        "peer_id": self.peer_id,
+                        "status": "OK",
+                        "features": Config().features,
+                        "ttl": Config().fixed_msg_ttl
+                    }
+                    writer.write(encode_message(hello_ok))
+                    await writer.drain()
+
+                else:
+                    logging.getLogger(__name__).info(f"Received unknown structured msg from {remote_peer or 'unknown'}: {msg}")
 
         except Exception as e:
             logging.getLogger(__name__).error(f"Server error handling client {remote_peer or 'unknown'}: {e}")

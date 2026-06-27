@@ -72,11 +72,11 @@ class RendezvousConnection:
             "name": name,
             "port": port
         }
-        logger.info(f"[Rendezvous] Unregistering peer {name}@{namespace} on port {port}...")
+        logger.info(f"[Rendezvous] Removendo registro (UNREGISTER) do peer {name}@{namespace} na porta {port}...")
         try:
             return await self.request(unregister_msg)
         except Exception as e:
-            logger.error(f"[Rendezvous] Failed to send UNREGISTER: {e}")
+            logger.error(f"[Rendezvous] Falha ao enviar requisição UNREGISTER: {e}")
             return {"status": "ERROR", "message": str(e)}
 
     async def registration_loop(self, namespace: str, name: str, port: int, initial_ttl: int):
@@ -89,7 +89,7 @@ class RendezvousConnection:
             try:
                 # Intervalo seguro: 80% do TTL atual, garantindo re-registro bem antes de expirar
                 sleep_time = max(5.0, ttl * 0.8)
-                logger.debug(f"[Rendezvous] Next registration update in {sleep_time:.1f} seconds (TTL={ttl}).")
+                logger.debug(f"[Rendezvous] Próxima atualização de registro em {sleep_time:.1f} segundos (TTL={ttl}).")
                 await asyncio.sleep(sleep_time)
 
                 register_msg = {
@@ -99,22 +99,22 @@ class RendezvousConnection:
                     "port": port,
                     "ttl": initial_ttl
                 }
-                logger.info(f"[Rendezvous] Re-registering peer {name}@{namespace} on port {port}...")
+                logger.info(f"[Rendezvous] Renovando registro (REGISTER) do peer {name}@{namespace} na porta {port}...")
                 response = await self.request(register_msg)
 
                 if response.get("status") == "OK":
                     ttl = response.get("ttl", initial_ttl)
-                    logger.debug(f"[Rendezvous] Re-registration successful. Granted TTL={ttl}.")
+                    logger.debug(f"[Rendezvous] Renovação de registro bem sucedida. TTL concedido={ttl}.")
                 else:
-                    error_msg = response.get("message", "unknown error")
-                    logger.warning(f"[Rendezvous] Re-registration failed: {error_msg}. Retrying in 10 seconds...")
+                    error_msg = response.get("message", "erro desconhecido")
+                    logger.warning(f"[Rendezvous] Falha na renovação de registro: {error_msg}. Tentando novamente em 10 segundos...")
                     # Reduz temporariamente o TTL virtual para tentar novamente rápido
                     ttl = 12.5  # 12.5 * 0.8 = 10s sleep
             except asyncio.CancelledError:
-                logger.info("[Rendezvous] Registration loop cancelled.")
+                logger.info("[Rendezvous] Loop de renovação de registro cancelado.")
                 break
             except Exception as e:
-                logger.error(f"[Rendezvous] Error in registration loop: {e}. Retrying in 10 seconds...")
+                logger.error(f"[Rendezvous] Erro no loop de renovação de registro: {e}. Tentando novamente em 10 segundos...")
                 ttl = 12.5
 
     async def discovery_loop(self, namespace: str, peer_table, interval: float, exclude_peer_id: str = None):
@@ -127,29 +127,29 @@ class RendezvousConnection:
                 discover_msg = {
                     "type": "DISCOVER"
                 }
-                logger.debug("[Rendezvous] Querying DISCOVER for all namespaces...")
+                logger.debug("[Rendezvous] Solicitando descoberta (DISCOVER) global...")
                 response = await self.request(discover_msg)
 
                 if response.get("status") == "OK":
                     peers = response.get("peers", [])
                     if exclude_peer_id:
                         peers = [p for p in peers if f"{p.get('name')}@{p.get('namespace')}" != exclude_peer_id]
-                    logger.debug(f"[Rendezvous] Discovery successful. Found {len(peers)} registered peer(s).")
+                    logger.debug(f"[Rendezvous] Descoberta bem sucedida. Encontrado(s) {len(peers)} peer(s) registrado(s).")
                     new_peers = peer_table.update_from_discovery(peers)
                     if new_peers:
                         for np in new_peers:
-                            logger.info(f"[Rendezvous] New peer discovered: {np.peer_id} at {np.ip}:{np.port}")
+                            logger.info(f"[Rendezvous] Novo peer descoberto: {np.peer_id} em {np.ip}:{np.port}")
                 else:
-                    error_msg = response.get("message", "unknown error")
-                    logger.warning(f"[Rendezvous] Discovery failed: {error_msg}")
+                    error_msg = response.get("message", "erro desconhecido")
+                    logger.warning(f"[Rendezvous] Falha na descoberta: {error_msg}")
             except asyncio.CancelledError:
-                logger.info("[Rendezvous] Discovery loop cancelled.")
+                logger.info("[Rendezvous] Loop de descoberta (DISCOVER) cancelado.")
                 break
             except Exception as e:
-                logger.error(f"[Rendezvous] Error in discovery loop: {e}")
+                logger.error(f"[Rendezvous] Erro no loop de descoberta: {e}")
 
             try:
                 await asyncio.sleep(interval)
             except asyncio.CancelledError:
-                logger.info("[Rendezvous] Discovery loop cancelled during sleep.")
+                logger.info("[Rendezvous] Loop de descoberta cancelado durante a pausa.")
                 break

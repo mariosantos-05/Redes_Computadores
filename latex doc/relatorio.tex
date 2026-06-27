@@ -67,35 +67,6 @@
     \end{center}
 \end{titlepage}
 
-% =================== FOLHA DE ROSTO ===================
-\begin{titlepage}
-    \begin{center}
-        {\large \textbf{Gabriel Gonçalves Caldo} -- 231034627}\\
-        {\large \textbf{Mario Augusto Vieira dos Santos} -- 231035778}\\
-        {\large \textbf{Daniel Rodrigues de Abreu} -- 241038540}\\[0.5cm]
-        {\large \textbf{Grupo 2}}\\[4cm]
-
-        \hrule
-        \vspace{0.8cm}
-        {\huge \textbf{RELATÓRIO TÉCNICO}}\\[0.4cm]
-        {\LARGE \textit{Projeto de Chat P2P (Versão Revisada)}}\\[0.8cm]
-        \hrule
-        \vspace{3cm}
-
-        \begin{flushright}
-        \begin{minipage}{0.5\textwidth}
-            \normalsize
-            Relatório técnico descritivo da arquitetura e protocolos de rede, apresentado como requisito parcial de avaliação para a disciplina de Redes de Computadores da Universidade de Brasília (UnB).
-        \end{minipage}
-        \end{flushright}
-        \vfill
-
-        {\large \textbf{Brasília, DF}}\\
-        {\large \textbf{\the\year}}
-    \end{center}
-\end{titlepage}
-
-\newpage
 % =================== SUMÁRIO ===================
 \tableofcontents
 \newpage
@@ -141,11 +112,14 @@ Abaixo, apresentamos o diagrama estrutural de como os módulos principais se org
 Nossa implementação divide a lógica em diversos módulos desacoplados:
 \begin{itemize}
     \item \textbf{\texttt{main.py}}: Arquivo principal. Carrega as definições, registra no servidor central via \texttt{rendezvous\_connection.py} e inicia o ciclo do \textit{event loop} do \texttt{asyncio}, englobando interface com usuário e servidor.
+    \item \textbf{\texttt{config.py}}: Classe central para carregar metadados e configurações do usuário a partir de \texttt{config.json} (como TTL e features do protocolo).
+    \item \textbf{\texttt{logging\_config.py}}: Módulo contendo lógicas avançadas (como \texttt{ReadlineConsoleHandler}) para harmonizar as saídas assíncronas do terminal sem quebrar a renderização da interface do usuário.
     \item \textbf{\texttt{peer\_server.py}}: Define o servidor local para escuta de conexões \textit{inbound} (recebidas) de outros pares P2P.
     \item \textbf{\texttt{peer\_connection.py}}: Implementa o manipulador de cada conexão TCP bidirecional (\textit{inbound} ou \textit{outbound}). Ele abstrai a leitura delimitada por \texttt{\textbackslash n}, lida com pacotes \textit{keep-alive} (\texttt{PING/PONG}), negocia a sessão inicial com \texttt{HELLO/HELLO\_OK} e despacha as mensagens de chat recebidas.
     \item \textbf{\texttt{rendezvous\_connection.py}}: Concentra a requisição sobre \textit{sockets} para interagir com o servidor de Rendezvous, tratando comandos de \texttt{REGISTER}, \texttt{DISCOVER} e \texttt{UNREGISTER}.
-    \item \textbf{\texttt{message\_router.py}}: O \textit{Router} é responsável pela difusão e roteamento em tempo real das saídas dos chats. Se for uma mensagem \textit{unicast} (direcionada a apenas um par, tipo \texttt{SEND}), ele busca a conexão específica. Se for \textit{broadcast} (tipo \texttt{PUB}), despacha a todos os pares válidos.
-    \item \textbf{\texttt{peer\_table.py}}: Funciona como a tabela de vizinhos ou estado (\textit{State}). Ele armazena metadados de outros pares registrados na mesma sala (\textit{namespace}) e controla a saúde dos enlaces, marcando pares obsoletos como inativos.
+    \item \textbf{\texttt{message\_router.py}}: O \textit{Router} é responsável por processar requisições P2P unificadas, evitando a duplicação de lógicas de protocolo para \textit{inbound} e \textit{outbound}. Se for uma mensagem \textit{unicast} (tipo \texttt{SEND}), ele exibe e envia o ACK. Se for \textit{broadcast} (tipo \texttt{PUB}), exibe publicamente e também auxilia no \textit{keep-alive} gerenciando PING/PONG.
+    \item \textbf{\texttt{peer\_table.py}}: Funciona como a tabela de vizinhos ou estado (\textit{State}). Ele armazena metadados de outros pares registrados na mesma sala (\textit{namespace}) e controla a saúde dos enlaces, marcando pares obsoletos como \texttt{STALE}.
+    \item \textbf{\texttt{reconnection\_manager.py}}: Cuida das tarefas em plano de fundo de reconexões usando políticas configuráveis, como o \textit{backoff exponencial}, definindo quantas vezes uma conexão rompida deve ser retentada.
     \item \textbf{\texttt{cli.py}}: Fornece a interface visual baseada em linha de comando interativa para acesso humano. Transmite chamadas dos comandos (ex: \texttt{/msg}, \texttt{/pub}, \texttt{/conn}) para as outras camadas.
 \end{itemize}
 
@@ -162,18 +136,21 @@ Todo enlace começa com o reconhecimento de identidade do \textit{peer}.
     \item \textbf{Exemplo Requisição (Alice $\rightarrow$ Bob):}
 \begin{lstlisting}[numbers=none]
 {
-  "type": "HELLO", 
-  "peer_id": "alice@UnB", 
-  "version": "1.0", 
-  "features": [],
-  "ttl": 1
+   "type": "HELLO",
+   "peer_id": "alice@UnB",
+   "version": "1.0",
+   "features": ["ack", "metrics"],
+   "ttl": 1
 }
 \end{lstlisting}
     \item \textbf{Exemplo Resposta (Bob $\rightarrow$ Alice):}
 \begin{lstlisting}[numbers=none]
 {
-  "type": "HELLO_OK", 
-  "peer_id": "bob@UnB"
+   "type": "HELLO_OK",
+   "peer_id": "bob@UnB",
+   "version": "1.0",
+   "features": ["ack", "metrics"],
+   "ttl": 1
 }
 \end{lstlisting}
 \end{itemize}
@@ -184,17 +161,19 @@ Para mensurar RTT (Tempo de Ida e Volta) e evidenciar que a conexão TCP não fo
     \item \textbf{Exemplo PING:}
 \begin{lstlisting}[numbers=none]
 {
-  "type": "PING", 
-  "peer_id": "alice@UnB", 
-  "version": "1.0", 
-  "features": [],
-  "ttl": 1
+   "type": "PING",
+   "msg_id": "uuid",
+   "timestamp": "2025-10-27T10:00:00Z",
+   "ttl": 1
 }
 \end{lstlisting}
     \item \textbf{Exemplo PONG:}
 \begin{lstlisting}[numbers=none]
 {
-  "type": "PONG"
+   "type": "PONG",
+   "msg_id": "uuid",
+   "timestamp": "2025-10-27T10:00:00Z",
+   "ttl": 1
 }
 \end{lstlisting}
 \end{itemize}
@@ -205,39 +184,85 @@ As mensagens usam a marcação \texttt{SEND} (Unicast), \texttt{ACK} (Recibo de 
     \item \textbf{Exemplo de SEND (Unicast com exigência de recibo):}
 \begin{lstlisting}[numbers=none]
 {
-  "type": "SEND", 
-  "msg_id": "550e8400-e29b-41d4-a716-446655440000",
-  "src": "alice@UnB", 
-  "dst": "bob@UnB", 
-  "payload": "Olá, tudo bem?", 
-  "require_ack": true, 
-  "ttl": 1
+   "type": "SEND",
+   "msg_id": "uuid",
+   "src": "alice@UnB",
+   "dst": "bob@UnB",
+   "payload": "Olá!",
+   "require_ack": true,
+   "ttl": 1
 }
 \end{lstlisting}
     \item \textbf{Exemplo de ACK correspondente:}
 \begin{lstlisting}[numbers=none]
 {
-  "type": "ACK", 
-  "msg_id": "uuid-da-mensagem-anterior", 
-  "timestamp": "2025-10-27T10:00:01Z", 
-  "ttl": 1
+   "type": "ACK",
+   "msg_id": "uuid",
+   "timestamp": "2025-10-27T10:00:01Z",
+   "ttl": 1
+}
+\end{lstlisting}
+    \item \textbf{Exemplo de PUB (Difusão Global e Namespace):}
+\begin{lstlisting}[numbers=none]
+{
+   "type": "PUB",
+   "msg_id": "uuid",
+   "src": "alice@UnB",
+   "dst": "*",
+   "payload": "Mensagem global",
+   "require_ack": false,
+   "ttl": 1
 }
 \end{lstlisting}
     \item \textbf{Exemplo de BYE (Encerramento do enlace TCP):}
 \begin{lstlisting}[numbers=none]
 {
-  "type": "BYE", 
-  "reason": "CLI Fechando a conexao"
+   "type": "BYE",
+   "msg_id": "uuid",
+   "src": "alice@UnB",
+   "dst": "bob@UnB",
+   "reason": "Encerrando sessão",
+   "ttl": 1
+}
+\end{lstlisting}
+    \item \textbf{Exemplo de BYE\_OK (Confirmação de encerramento):}
+\begin{lstlisting}[numbers=none]
+{
+   "type": "BYE_OK",
+   "msg_id": "uuid",
+   "src": "bob@UnB",
+   "dst": "alice@UnB",
+   "ttl": 1
 }
 \end{lstlisting}
 \end{itemize}
+
+\section{Interface de Usuário (CLI)}
+
+A aplicação fornece uma interface interativa de linha de comando para interação humana em tempo real com a rede. Os comandos suportados e suas respectivas funções são descritos abaixo:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Comando} & \textbf{Função} \\ \hline
+\texttt{/peers [* | \#namespace]} & Descobrir e listar peers ativos na tabela \\ \hline
+\texttt{/msg <peer\_id> <mensagem>} & Enviar mensagem direta (Unicast) \\ \hline
+\texttt{/pub * <mensagem>} & Enviar broadcast global \\ \hline
+\texttt{/pub \#<namespace> <mensagem>} & Enviar mensagem para todos do namespace \\ \hline
+\texttt{/conn} & Mostrar conexões ativas (inbound/outbound) \\ \hline
+\texttt{/rtt} & Exibir RTT médio por peer via keep-alive \\ \hline
+\texttt{/reconnect} & Forçar reconciliação de peers (desconectados) \\ \hline
+\texttt{/log <Nível>} & Ajustar nível de log (DEBUG, INFO...) \\ \hline
+\texttt{/quit} & Encerrar aplicação de forma segura e limpa \\ \hline
+\end{tabular}
+\end{table}
 
 \section{Instruções Detalhadas para Execução}
 
 Esta subseção responde às perguntas contidas na documentação técnica para viabilizar a implantação local pelos usuários ou avaliadores.
 
 \subsection{Requisitos Mínimos para Executar o Programa em Linux}
-Sim, \textbf{é obrigatório que o programa rode no Linux}. Os requisitos mínimos são:
 \begin{enumerate}
     \item Sistema Operacional derivado do Kernel Linux (Ubuntu 20.04+, Debian, Fedora, Arch, etc.).
     \item Interpretador \textbf{Python versão 3.8 ou superior} nativamente instalado.
@@ -249,7 +274,7 @@ Sim, \textbf{é obrigatório que o programa rode no Linux}. Os requisitos mínim
 Como o ecossistema é alicerçado sob a linguagem \textbf{Python}, não é feito uso de nenhuma linguagem \textit{Ahead-of-Time} (AoT) compilada, como C ou Java. Assim, \textbf{não deve ser feita nenhuma compilação prévia do código}. O código é interpretado dinamicamente durante o tempo de execução através do \textit{bytecode} do interpretador \texttt{python3}.
 
 \subsection{Bibliotecas Necessárias e Como Instaladas}
-O projeto arquitetural atendeu rigorosamente à solicitação de evitar dependências complexas e \textit{frameworks} exógenos. Desta forma, \textbf{apenas a Biblioteca Padrão do Python (Standard Library)} foi utilizada. Bibliotecas como \texttt{asyncio}, \texttt{socket}, \texttt{json}, \texttt{logging} e \texttt{datetime} estão nativamente embarcadas no Python.
+\textbf{Apenas a Biblioteca Padrão do Python (Standard Library)} foi utilizada. Bibliotecas como \texttt{asyncio}, \texttt{socket}, \texttt{json}, \texttt{logging} e \texttt{datetime} estão nativamente embarcadas no Python.
 \textbf{Não existem bibliotecas extras exigidas para o uso do programa}. O documento \texttt{requirements.txt} inclui estritamente artefatos suplementares de formatação recomendados (como o \texttt{black} e o \texttt{flake8}) unicamente voltados a ambiente de desenvolvimento (\textit{dev-environment}), cuja instalação é totalmente omitível.
 Caso mesmo assim haja interesse nestas ferramentas de estilo:
 \begin{lstlisting}[language=bash, numbers=none]
@@ -270,13 +295,7 @@ $ cd /caminho/ate/Redes_Computadores/
 \begin{lstlisting}[language=bash, numbers=none]
 $ python3 main.py
 \end{lstlisting}
-    \item O \textit{CLI} interativo abrirá o canal após notificar seu registro com sucesso. Você pode, agora, explorar os comandos:
-        \begin{itemize}
-            \item \texttt{/peers *} para invocar uma verificação global da mesa Rendezvous.
-            \item \texttt{/conn} para analisar ativamente com quem seu hospedeiro está amarrado no protocolo TCP local.
-            \item \texttt{/msg [peer\_id] [mensagem]} para realizar o envio \textit{unicast}.
-            \item \texttt{/pub * [mensagem]} para lançar pacotes \textit{broadcast}.
-        \end{itemize}
+    \item O \textit{CLI} interativo abrirá o canal após notificar seu registro com sucesso. Você pode, agora, explorar os comandos detalhados na Seção 4. 
     \item Digite \texttt{/quit} quando terminar de usar, para assim desregistrar-se no servidor e finalizar todas as sessões.
 \end{enumerate}
 

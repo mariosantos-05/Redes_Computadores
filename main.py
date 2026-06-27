@@ -33,7 +33,7 @@ async def main():
 
     # Configura o logger
     logger = setup_logger(cfg.log_level)
-    logger.info("Starting P2P Chat application...")
+    logger.info("Iniciando aplicação Chat P2P...")
 
     # 1. Instanciamento da tabela de peers e state da aplicação
     peer_table = PeerTable(max_reconnect_attempts=cfg.max_reconnect_attempts)
@@ -108,17 +108,17 @@ async def main():
     )
 
     # 6. Execução do servidor local TCP com tratamento de saída limpa
-    # Start server explicitly without blocking indefinitely
+    # Inicia o servidor local explicitamente sem bloquear a thread principal
     server_runner = await asyncio.start_server(
         server.handle_client,
         "0.0.0.0",
         server.port,
         limit=32768
     )
-    logger.info(f"listening on port {server.port}")
+    logger.info(f"Ouvindo conexões (inbound) na porta {server.port}")
 
     try:
-        # Wait until shutdown event is set (e.g. by CLI /quit)
+        # Aguarda até que o evento de desligamento seja acionado (ex: pelo comando /quit na CLI)
         await shutdown_event.wait()
     except asyncio.CancelledError:
         logger.info("Sinal de encerramento recebido (CancelledError).")
@@ -127,11 +127,11 @@ async def main():
         
         # Envia BYE para todas conexões de saída ativas
         for pid, conn in outbound_connections.items():
-            logger.info(f"Closing outbound connection to {pid}...")
-            await conn.disconnect(reason="Client shutting down")
+            logger.info(f"Fechando conexão de saída (outbound) com {pid}...")
+            await conn.disconnect(reason="Cliente está sendo desligado (shutdown)")
             await conn.close()
 
-        # Cancela loops
+        # Cancela loops assíncronos que estão rodando em background
         reg_task.cancel()
         disc_task.cancel()
         reconn_task.cancel()

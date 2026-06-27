@@ -22,9 +22,13 @@ from peer_connection import PeerConnection
 from peer_table import PeerTable
 
 async def async_input(prompt: str) -> str:
-    """Read input from stdin asynchronously using run_in_executor and input()."""
+    """
+    Lê a entrada do usuário de forma assíncrona usando run_in_executor e a função input().
+    Como o módulo readline já foi importado, ele automaticamente gerencia o histórico de
+    comandos e navegação por setas.
+    """
     loop = asyncio.get_event_loop()
-    # input() automatically uses readline and handles prompt
+    # Executa a função síncrona input() em uma thread separada para não bloquear o event loop
     return await loop.run_in_executor(None, input, prompt)
 
 from logging_config import ReadlineConsoleHandler
@@ -36,15 +40,21 @@ async def cli_loop(
     shutdown_event: asyncio.Event
 ):
     """
-    Interactive CLI loop.
+    Loop interativo da Interface de Linha de Comando (CLI).
+    Permite que o usuário insira comandos em tempo real sem interromper as rotinas
+    de rede que executam em plano de fundo.
     """
     logger = logging.getLogger(__name__)
-    await asyncio.sleep(1.0) # Wait for initial logs
+    await asyncio.sleep(1.0) # Aguarda 1 segundo para garantir que os logs iniciais (ex: registro) passem
 
     ReadlineConsoleHandler.cli_active = True
 
     while not shutdown_event.is_set():
         try:
+            # Limpa qualquer prompt 'p2p> ' deixado pela thread de logs do ReadlineConsoleHandler
+            # garantindo que o input() desenhe apenas um único prompt na tela.
+            sys.stdout.write('\r\x1b[K')
+            sys.stdout.flush()
             line = await async_input("p2p> ")
             if shutdown_event.is_set():
                 break
@@ -71,48 +81,50 @@ async def cli_loop(
 
             elif cmd == "/msg":
                 if len(parts) < 3:
-                    print("Usage: /msg <peer_id> <message>")
+                    print("Uso: /msg <peer_id> <mensagem>")
                     continue
                 target_id = parts[1]
                 msg_content = parts[2]
                 
-                # Check if we have an active connection
+                # Verifica se já possuímos uma conexão TCP ativa com este peer
                 conn = outbound_connections.get(target_id)
                 
-                # If not, try to establish one
+                # Se não possuir, tenta descobrir o peer e estabelecer a conexão
                 if conn is None:
                     peer_entry = peer_table.get_peer(target_id)
                     if not peer_entry:
-                        print(f"Unknown peer: {target_id}. Try /peers to discover.")
+                        print(f"Peer desconhecido: {target_id}. Tente usar /peers para descobrir novos peers.")
                         continue
                     
-                    print(f"Connecting to {target_id} at {peer_entry.ip}:{peer_entry.port}...")
+                    print(f"Conectando a {target_id} em {peer_entry.ip}:{peer_entry.port}...")
                     conn = PeerConnection(peer_id, peer_table)
                     try:
                         await conn.connect(peer_entry.ip, peer_entry.port)
+                        # Inicia a tarefa de escuta contínua para essa nova conexão
                         asyncio.create_task(conn.listen())
                         outbound_connections[target_id] = conn
                     except Exception as e:
-                        print(f"Failed to connect: {e}")
+                        print(f"Falha ao conectar: {e}")
                         continue
                 
-                # Send the message
+                # Envia a mensagem com um UUID único
                 msg_id = str(uuid.uuid4())
                 try:
                     await conn.send_message(msg_content, msg_id, require_ack=True)
                 except Exception as e:
-                    print(f"Failed to send message: {e}")
+                    print(f"Falha ao enviar mensagem: {e}")
                     if target_id in outbound_connections:
                         del outbound_connections[target_id]
 
             elif cmd == "/pub":
                 if len(parts) < 3:
-                    print("Usage: /pub <* | #namespace> <message>")
+                    print("Uso: /pub <* | #namespace> <mensagem>")
                     continue
                 scope = parts[1]
                 msg_content = parts[2]
                 msg_id = str(uuid.uuid4())
                 
+                # Identifica todos os peers que correspondem ao escopo selecionado (global ou namespace)
                 target_peers = []
                 for p in peer_table.get_all_peers():
                     if scope == "*":
@@ -122,10 +134,10 @@ async def cli_loop(
 
                 count = 0
                 for p in target_peers:
-                    # Reuse connection if active
+                    # Reaproveita a conexão ativa, se já existir
                     conn = outbound_connections.get(p.peer_id)
                     if conn is None:
-                        # Attempt to connect
+                        # Se não existir, tenta abrir a conexão em background para o envio
                         conn = PeerConnection(peer_id, peer_table)
                         try:
                             await conn.connect(p.ip, p.port)
@@ -134,40 +146,41 @@ async def cli_loop(
                         except Exception:
                             continue
                     
-                    # Publish over connection
+                    # Dispara a mensagem PUB sobre a conexão, propagando-a no escopo definido
                     try:
                         await conn.publish(msg_content, msg_id, scope)
                         count += 1
                     except Exception:
                         pass
-                print(f"Broadcasted to {count} peers.")
+                print(f"Broadcast enviado para {count} peer(s).")
 
             elif cmd == "/conn":
-                print("--- Active Outbound Connections ---")
+                print("--- Conexões Ativas de Saída (Outbound) ---")
+                # Exibe uma lista das conexões TCP que foram iniciadas por este nó
                 for pid, conn in outbound_connections.items():
-                    print(f"{pid} -> connected")
-                print("-----------------------------------")
+                    print(f"{pid} -> Conectado")
+                print("-----------------------------------------")
                 
             elif cmd == "/rtt":
-                print("--- RTT per Peer ---")
+                print("--- RTT Médio por Peer ---")
                 for p in peer_table.get_all_peers():
                     if p.average_rtt is not None:
                         print(f"{p.peer_id}: {p.average_rtt:.2f} ms")
                     else:
-                        print(f"{p.peer_id}: N/A")
-                print("--------------------")
+                        print(f"{p.peer_id}: N/D")
+                print("--------------------------")
 
             elif cmd == "/reconnect":
-                print("Triggering manual reconnect for all disconnected/stale peers...")
+                print("Iniciando reconexão manual para todos os peers desconectados/obsoletos...")
                 for p in peer_table.get_all_peers():
                     if p.status in ["DISCONNECTED", "STALE"]:
                         p.status = "RECONNECTING"
-                        p.next_attempt_allowed_at = 0.0 # Force immediate
+                        p.next_attempt_allowed_at = 0.0 # Força tentativa imediata
                         p.reconnect_attempts = 0
 
             elif cmd == "/log":
                 if len(parts) < 2:
-                    print("Usage: /log <DEBUG|INFO|WARNING|ERROR>")
+                    print("Uso: /log <DEBUG|INFO|WARNING|ERROR>")
                     continue
                 level_str = parts[1].upper()
                 num_level = getattr(logging, level_str, None)
@@ -175,33 +188,34 @@ async def cli_loop(
                     logging.getLogger().setLevel(num_level)
                     for handler in logging.getLogger().handlers:
                         handler.setLevel(num_level)
-                    print(f"Log level set to {level_str}")
+                    print(f"Nível de log alterado para {level_str}")
                 else:
-                    print(f"Invalid log level: {level_str}")
+                    print(f"Nível de log inválido: {level_str}")
 
             elif cmd == "/help":
-                print("--- Available Commands ---")
-                print("  /help                                    : Show this help message")
-                print("  /peers [* | #namespace]                  : List known peers")
-                print("  /msg <peer_id> <message>                 : Send a direct message to a peer")
-                print("  /pub <* | #namespace> <message>          : Broadcast a message to peers")
-                print("  /conn                                    : Show active outbound connections")
-                print("  /rtt                                     : Show average RTT per peer")
-                print("  /reconnect                               : Force immediate reconnect attempts")
-                print("  /log <DEBUG|INFO|WARNING|ERROR>          : Change logging level")
-                print("  /quit                                    : Exit the application")
-                print("--------------------------")
+                print("--- Comandos Disponíveis ---")
+                print("  /help                                    : Exibe esta mensagem de ajuda")
+                print("  /peers [* | #namespace]                  : Lista peers conhecidos")
+                print("  /msg <peer_id> <mensagem>                 : Envia mensagem direta (unicast)")
+                print("  /pub <* | #namespace> <mensagem>          : Envia mensagem global (broadcast)")
+                print("  /conn                                    : Exibe conexões ativas (saída)")
+                print("  /rtt                                     : Exibe o RTT médio por peer")
+                print("  /reconnect                               : Força tentativa imediata de reconexão")
+                print("  /log <DEBUG|INFO|WARNING|ERROR>          : Altera nível do log do sistema")
+                print("  /quit                                    : Sai e finaliza a aplicação")
+                print("----------------------------")
 
             elif cmd == "/quit":
-                print("Initiating clean shutdown...")
+                print("Iniciando encerramento limpo (Clean Shutdown)...")
                 shutdown_event.set()
                 break
 
             else:
-                print(f"Unknown command: {cmd}")
+                print(f"Comando desconhecido: {cmd}. Digite /help para listar comandos.")
 
         except Exception as e:
-            logger.error(f"CLI error: {e}")
+            logger.error(f"Erro no CLI: {e}")
             break
             
+    # Sinaliza que o CLI foi desativado para restaurar o comportamento normal de logs
     ReadlineConsoleHandler.cli_active = False
