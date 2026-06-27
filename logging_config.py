@@ -65,7 +65,7 @@ def setup_logger(level_name: str = "INFO") -> logging.Logger:
     console_handler.setLevel(numeric_level)
     console_handler.setFormatter(formatter)
     
-    # File Handler (p2p.log)
+    # Tratador de Arquivo (p2p.log)
     file_handler = logging.FileHandler("p2p.log", mode='a')
     file_handler.setLevel(numeric_level)
     file_handler.setFormatter(formatter)

@@ -103,9 +103,9 @@ class PeerServer:
 
                 # Processamento específico do Servidor (HELLO)
                 if msg.get("type") == "HELLO":
-                    remote_peer = msg.get("peer_id", "unknown")
+                    remote_peer = msg.get("peer_id", "desconhecido")
                     remote_addr = writer.get_extra_info('peername')
-                    logging.getLogger(__name__).info(f"[PeerServer] Inbound connected: {remote_peer} from {remote_addr}")
+                    logging.getLogger(__name__).info(f"[PeerServer] Conexão de entrada: {remote_peer} de {remote_addr}")
 
                     # Se estiver usando uma tabela de peers, registra o peer entrante
                     if self.peer_table:
@@ -122,10 +122,10 @@ class PeerServer:
                     await writer.drain()
 
                 else:
-                    logging.getLogger(__name__).info(f"Received unknown structured msg from {remote_peer or 'unknown'}: {msg}")
+                    logging.getLogger(__name__).info(f"Mensagem estruturada desconhecida recebida de {remote_peer or 'desconhecido'}: {msg}")
 
         except Exception as e:
-            logging.getLogger(__name__).error(f"Server error handling client {remote_peer or 'unknown'}: {e}")
+            logging.getLogger(__name__).error(f"Erro no servidor ao lidar com cliente {remote_peer or 'desconhecido'}: {e}")
         finally:
             self.active_connections.discard(writer)
             current_task = asyncio.current_task()
@@ -137,7 +137,7 @@ class PeerServer:
                 await writer.wait_closed()
             except Exception:
                 pass
-            logging.getLogger(__name__).info(f"Connection with client {remote_peer or 'unknown'} closed")
+            logging.getLogger(__name__).info(f"Conexão com cliente {remote_peer or 'desconhecido'} fechada")
 
             # Atualiza o status do peer na tabela se ele estava conectado
             if self.peer_table and remote_peer:
@@ -161,7 +161,7 @@ class PeerServer:
             self.port
         )
 
-        logging.getLogger(__name__).info(f"listening on port {self.port}")
+        logging.getLogger(__name__).info(f"Escutando na porta {self.port}")
     
         try:
             # Mantém o loop de eventos focado em servir o socket deste servidor para sempre,
@@ -169,7 +169,7 @@ class PeerServer:
             await asyncio.Event().wait()
         finally:
             server.close()
-            logging.getLogger(__name__).info(f"[PeerServer] Stopping server on port {self.port}, cancelling {len(self.active_tasks)} active client tasks...")
+            logging.getLogger(__name__).info(f"[PeerServer] Parando servidor na porta {self.port}, cancelando {len(self.active_tasks)} tarefas de clientes ativos...")
             for task in list(self.active_tasks):
                 task.cancel()
             for w in list(self.active_connections):

@@ -46,7 +46,7 @@ async def process_common_messages(msg: dict, local_peer_id: str, remote_peer_id:
     msg_type = msg.get("type")
     
     if msg_type == "PING":
-        logging.getLogger(__name__).debug(f"PING RECEBIDO de {remote_peer_id or 'unknown'}")
+        logging.getLogger(__name__).debug(f"PING RECEBIDO de {remote_peer_id or 'desconhecido'}")
         pong = {
             "type": "PONG",
             "msg_id": msg.get("msg_id", str(uuid.uuid4())),
@@ -54,11 +54,11 @@ async def process_common_messages(msg: dict, local_peer_id: str, remote_peer_id:
             "ttl": Config().fixed_msg_ttl
         }
         await send_func(pong)
-        logging.getLogger(__name__).debug(f"PONG ENVIADO para {remote_peer_id or 'unknown'}")
+        logging.getLogger(__name__).debug(f"PONG ENVIADO para {remote_peer_id or 'desconhecido'}")
         return "HANDLED"
 
     elif msg_type == "SEND":
-        sender  = msg.get("src", remote_peer_id or "unknown")
+        sender  = msg.get("src", remote_peer_id or "desconhecido")
         content = msg.get("payload", "")
         msg_id  = msg.get("msg_id")
         logging.getLogger(__name__).info(f"[SEND] {sender}: {content}")
@@ -75,7 +75,7 @@ async def process_common_messages(msg: dict, local_peer_id: str, remote_peer_id:
         return "HANDLED"
 
     elif msg_type == "PUB":
-        sender  = msg.get("src", remote_peer_id or "unknown")
+        sender  = msg.get("src", remote_peer_id or "desconhecido")
         content = msg.get("payload", "")
         scope   = msg.get("dst", "*")
         logging.getLogger(__name__).info(f"[PUB] [{scope}] {sender}: {content}")
@@ -83,13 +83,13 @@ async def process_common_messages(msg: dict, local_peer_id: str, remote_peer_id:
 
     elif msg_type == "BYE":
         reason = msg.get("reason", "Sem motivo especificado")
-        logging.getLogger(__name__).info(f"Recebido comando BYE de {remote_peer_id or 'unknown'}. Motivo: {reason}")
+        logging.getLogger(__name__).info(f"Recebido comando BYE de {remote_peer_id or 'desconhecido'}. Motivo: {reason}")
         
         bye_ok = {
             "type": "BYE_OK",
             "msg_id": msg.get("msg_id", str(uuid.uuid4())),
             "src": local_peer_id,
-            "dst": msg.get("src", remote_peer_id or "unknown"),
+            "dst": msg.get("src", remote_peer_id or "desconhecido"),
             "ttl": Config().fixed_msg_ttl
         }
         await send_func(bye_ok)

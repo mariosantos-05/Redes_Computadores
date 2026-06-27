@@ -16,7 +16,7 @@ import asyncio
 import sys
 import logging
 import uuid
-import readline # Enables arrow keys and history for input()
+import readline # Habilita teclas de seta e histórico para input()
 from typing import Dict
 from peer_connection import PeerConnection
 from peer_table import PeerTable
@@ -69,14 +69,15 @@ async def cli_loop(
             if cmd == "/peers":
                 filter_arg = parts[1] if len(parts) > 1 else None
                 peers = peer_table.get_all_peers()
-                print("--- Known Peers ---")
+                print("--- Peers Conhecidos ---")
                 for p in peers:
                     if filter_arg == "*" or filter_arg is None:
                         pass
                     elif filter_arg.startswith("#"):
                         if p.namespace != filter_arg[1:]:
                             continue
-                    print(f"[{p.status}] {p.peer_id} at {p.ip}:{p.port} (TTL: {p.ttl})")
+                    status_br = {"DISCONNECTED": "DESCONECTADO", "CONNECTED": "CONECTADO", "RECONNECTING": "RECONECTANDO", "STALE": "OBSOLETO"}.get(p.status, p.status)
+                    print(f"[{status_br}] {p.peer_id} em {p.ip}:{p.port} (TTL: {p.ttl})")
                 print("-------------------")
 
             elif cmd == "/msg":
@@ -155,7 +156,7 @@ async def cli_loop(
                 print(f"Broadcast enviado para {count} peer(s).")
 
             elif cmd == "/conn":
-                print("--- Conexões Ativas de Saída (Outbound) ---")
+                print("--- Conexões Ativas de Saída ---")
                 # Exibe uma lista das conexões TCP que foram iniciadas por este nó
                 for pid, conn in outbound_connections.items():
                     print(f"{pid} -> Conectado")
@@ -173,7 +174,7 @@ async def cli_loop(
             elif cmd == "/reconnect":
                 print("Iniciando reconexão manual para todos os peers desconectados/obsoletos...")
                 for p in peer_table.get_all_peers():
-                    if p.status in ["DISCONNECTED", "STALE"]:
+                    if p.status in ["DISCONNECTED", "STALE", "RECONNECTING"]:
                         p.status = "RECONNECTING"
                         p.next_attempt_allowed_at = 0.0 # Força tentativa imediata
                         p.reconnect_attempts = 0
@@ -206,7 +207,7 @@ async def cli_loop(
                 print("----------------------------")
 
             elif cmd == "/quit":
-                print("Iniciando encerramento limpo (Clean Shutdown)...")
+                print("Iniciando encerramento limpo...")
                 shutdown_event.set()
                 break
 

@@ -14,9 +14,30 @@
 
 import asyncio
 import logging
+import time
 from peer_connection import PeerConnection
 from peer_table import PeerTable
 from typing import Dict
+
+async def _attempt_reconnect(peer_id, peer, peer_table, outbound_connections, logger):
+    logger.info(f"[Reconnect] Tentando reconectar automaticamente a {peer.peer_id} em {peer.ip}:{peer.port}")
+    conn = PeerConnection(peer_id, peer_table)
+    try:
+        await conn.connect(peer.ip, peer.port)
+        listen_task = asyncio.create_task(conn.listen())
+        
+        # Se a identidade do peer mudou (ex: reaproveitamento de IP)
+        if conn.remote_peer_id and conn.remote_peer_id != peer.peer_id:
+            peer_table.mark_stale(peer.peer_id)
+            outbound_connections[conn.remote_peer_id] = conn
+            logger.info(f"[Reconnect] Peer mudou de identidade. Era {peer.peer_id}, agora é {conn.remote_peer_id}")
+        else:
+            outbound_connections[peer.peer_id] = conn
+            logger.info(f"[Reconnect] Reconectado com sucesso a {peer.peer_id}")
+            
+    except Exception as e:
+        logger.warning(f"[Reconnect] Falha ao reconectar a {peer.peer_id}: {e}")
+        peer_table.mark_failed_attempt(peer.peer_id)
 
 async def reconnection_loop(
     peer_id: str,
@@ -35,23 +56,11 @@ async def reconnection_loop(
             await asyncio.sleep(interval)
             candidates = peer_table.get_peers_to_reconnect()
             
+            # Lança tarefas concorrentes para não bloquear o loop caso uma das conexões sofra timeout
             for peer in candidates:
-                logger.info(f"[Reconnect] Tentando reconectar automaticamente a {peer.peer_id} em {peer.ip}:{peer.port}")
-                
-                # Cria uma nova instância de conexão
-                conn = PeerConnection(peer_id, peer_table)
-                try:
-                    await conn.connect(peer.ip, peer.port)
-                    # Inicia a escuta contínua de mensagens
-                    listen_task = asyncio.create_task(conn.listen())
-                    
-                    # Armazena a nova conexão ativa
-                    outbound_connections[peer.peer_id] = conn
-                    logger.info(f"[Reconnect] Reconectado com sucesso a {peer.peer_id}")
-                except Exception as e:
-                    logger.warning(f"[Reconnect] Falha ao reconectar a {peer.peer_id}: {e}")
-                    # Registra a falha, o que incrementará o contador e aumentará o tempo do próximo backoff exponencial
-                    peer_table.mark_failed_attempt(peer.peer_id)
+                # Previne múltiplas tentativas simultâneas para o mesmo peer jogando o timer para o futuro
+                peer.next_attempt_allowed_at = time.time() + 60.0
+                asyncio.create_task(_attempt_reconnect(peer_id, peer, peer_table, outbound_connections, logger))
                     
     except asyncio.CancelledError:
         pass
