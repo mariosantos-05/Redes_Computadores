@@ -47,24 +47,20 @@ class Config:
             self.peer_id = f"{self.name}@{self.namespace}"
             
             # Endereço e Porta do Rendezvous (Servidor Central de Descoberta)
-            rdv = data.get("rendezvous", {})
-            self.rdv_host = rdv.get("host", "45.171.101.167")
-            self.rdv_port = int(rdv.get("port", 8080))
+            self.rdv_host = data.get("rdv_host", "45.171.101.167")
+            self.rdv_port = int(data.get("rdv_port", 8080))
             
             # Configurações do servidor local (porta em que este nó vai escutar conexões)
-            server = data.get("server", {})
-            self.listen_port = int(server.get("port", 0)) # 0 significa escolher uma porta livre dinamicamente
+            self.listen_port = int(data.get("tcp_port", 0)) # Usando tcp_port como porta de escuta principal
             
             # Protocolo (Metadados do Handshake)
-            protocol = data.get("protocol", {})
-            self.version = protocol.get("version", "1.0")
-            self.features = protocol.get("features", ["ack"])
-            self.fixed_msg_ttl = protocol.get("fixed_msg_ttl", 1)
+            self.version = data.get("version", "1.0")
+            self.features = data.get("features", ["ack"])
+            self.fixed_msg_ttl = data.get("fixed_msg_ttl", 1)
             
             # Tempos de reconexão e TTL do Servidor
-            reconnect = data.get("reconnect", {})
-            self.max_reconnect_attempts = int(reconnect.get("max_reconnect_attempts", 5))
-            self.rdv_ttl = int(reconnect.get("rdv_ttl", 3600))
+            self.max_reconnect_attempts = int(data.get("max_reconnect_attempts", 5))
+            self.rdv_ttl = int(data.get("rdv_ttl", 3600))
             
             # Parâmetros adicionais
             self.log_level = data.get("log_level", "INFO")

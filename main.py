@@ -42,7 +42,7 @@ async def main():
 
     # 2. Criação do servidor do Peer local:
     peer_id = f"{cfg.name}@{cfg.namespace}"
-    port = cfg.tcp_port
+    port = cfg.listen_port
     server = PeerServer(peer_id, port, peer_table)
     
     # 3. Inicialização da conexão com o Rendezvous:
