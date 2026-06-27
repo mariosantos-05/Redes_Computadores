@@ -161,7 +161,7 @@ class PeerConnection:
                 timeout=5.0
             )
     
-            logging.getLogger(__name__).info("Conexão TCP estabelecida")
+            logging.getLogger(__name__).debug("Conexão TCP física estabelecida, iniciando handshake...")
     
             # Prepara a mensagem de identificação 'HELLO' conforme os padrões do protocolo
             hello_msg = {

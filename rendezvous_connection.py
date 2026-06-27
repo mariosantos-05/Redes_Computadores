@@ -117,7 +117,15 @@ class RendezvousConnection:
                 logger.error(f"[Rendezvous] Erro no loop de renovação de registro: {e}. Tentando novamente em 10 segundos...")
                 ttl = 12.5
 
-    async def discovery_loop(self, namespace: str, peer_table, interval: float, exclude_peer_id: str = None):
+    async def discovery_loop(
+        self,
+        namespace: str,
+        peer_table,
+        interval: float,
+        exclude_peer_id: str = None,
+        active_connections: dict = None,
+        local_peer_id: str = None
+    ):
         """
         Loop de background para buscar periodicamente novos peers no namespace e atualizar a tabela.
         """
@@ -139,6 +147,19 @@ class RendezvousConnection:
                     if new_peers:
                         for np in new_peers:
                             logger.info(f"[Rendezvous] Novo peer descoberto: {np.peer_id} em {np.ip}:{np.port}")
+                    
+                    # Conectar automaticamente a todos os peers descobertos que não estão conectados
+                    if active_connections is not None and local_peer_id is not None:
+                        for p_info in peers:
+                            p_id = f"{p_info['name']}@{p_info['namespace']}"
+                            if p_id == exclude_peer_id:
+                                continue
+                            
+                            peer_entry = peer_table.get_peer(p_id)
+                            if peer_entry and peer_entry.status == "DISCONNECTED" and p_id not in active_connections:
+                                asyncio.create_task(
+                                    self._connect_to_peer(peer_entry, local_peer_id, peer_table, active_connections)
+                                )
                 else:
                     error_msg = response.get("message", "erro desconhecido")
                     logger.warning(f"[Rendezvous] Falha na descoberta: {error_msg}")
@@ -153,3 +174,30 @@ class RendezvousConnection:
             except asyncio.CancelledError:
                 logger.info("[Rendezvous] Loop de descoberta cancelado durante a pausa.")
                 break
+
+    async def _connect_to_peer(self, peer, local_peer_id, peer_table, active_connections):
+        """
+        Inicia uma conexão TCP em background com o peer informado.
+        """
+        logger = logging.getLogger(__name__)
+        # Verifica novamente o status para evitar race conditions
+        if peer.status == "CONNECTED" or peer.peer_id in active_connections:
+            return
+            
+        # Define um placeholder temporário para atuar como trava
+        active_connections[peer.peer_id] = "connecting"
+        
+        from peer_connection import PeerConnection
+        conn = PeerConnection(local_peer_id, peer_table)
+        try:
+            logger.info(f"[Descoberta] Iniciando conexão automática com peer descoberto {peer.peer_id} em {peer.ip}:{peer.port}...")
+            await conn.connect(peer.ip, peer.port)
+            # Inicia escuta da conexão
+            asyncio.create_task(conn.listen())
+            active_connections[peer.peer_id] = conn
+            logger.info(f"[Descoberta] Conexão automática com {peer.peer_id} estabelecida com sucesso")
+        except Exception as e:
+            err_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+            logger.warning(f"[Descoberta] Falha na conexão automática com {peer.peer_id}: {err_msg}")
+            active_connections.pop(peer.peer_id, None)
+            peer_table.mark_failed_attempt(peer.peer_id)

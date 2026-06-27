@@ -274,14 +274,7 @@ Esta subseção responde às perguntas contidas na documentação técnica para 
 Como o ecossistema é alicerçado sob a linguagem \textbf{Python}, não é feito uso de nenhuma linguagem \textit{Ahead-of-Time} (AoT) compilada, como C ou Java. Assim, \textbf{não deve ser feita nenhuma compilação prévia do código}. O código é interpretado dinamicamente durante o tempo de execução através do \textit{bytecode} do interpretador \texttt{python3}.
 
 \subsection{Bibliotecas Necessárias e Como Instaladas}
-\textbf{Apenas a Biblioteca Padrão do Python (Standard Library)} foi utilizada. Bibliotecas como \texttt{asyncio}, \texttt{socket}, \texttt{json}, \texttt{logging} e \texttt{datetime} estão nativamente embarcadas no Python.
-\textbf{Não existem bibliotecas extras exigidas para o uso do programa}. O documento \texttt{requirements.txt} inclui estritamente artefatos suplementares de formatação recomendados (como o \texttt{black} e o \texttt{flake8}) unicamente voltados a ambiente de desenvolvimento (\textit{dev-environment}), cuja instalação é totalmente omitível.
-Caso mesmo assim haja interesse nestas ferramentas de estilo:
-\begin{lstlisting}[language=bash, numbers=none]
-$ python3 -m venv .venv
-$ source .venv/bin/activate
-$ pip install -r requirements.txt
-\end{lstlisting}
+\textbf{Apenas a Biblioteca Padrão do Python (Standard Library)} foi utilizada. Bibliotecas como \texttt{asyncio}, \texttt{socket}, \texttt{json}, \texttt{logging} e \texttt{datetime} estão nativamente embarcadas no Python. \textbf{Não existem bibliotecas extras exigidas para o uso do programa}.
 
 \subsection{Passos Necessários para Executar o Programa}
 A cadeia de passos sequenciais que guiam o sistema ao pleno funcionamento no terminal Linux é:
@@ -295,7 +288,7 @@ $ cd /caminho/ate/Redes_Computadores/
 \begin{lstlisting}[language=bash, numbers=none]
 $ python3 main.py
 \end{lstlisting}
-    \item O \textit{CLI} interativo abrirá o canal após notificar seu registro com sucesso. Você pode, agora, explorar os comandos detalhados na Seção 4. 
+    \item O \textit{CLI} interativo abrirá o canal após notificar seu registro com sucesso. Você pode, agora, explorar os comandos detalhados na Seção 4, e mostrados com o comando \texttt{/help}. 
     \item Digite \texttt{/quit} quando terminar de usar, para assim desregistrar-se no servidor e finalizar todas as sessões.
 \end{enumerate}
 

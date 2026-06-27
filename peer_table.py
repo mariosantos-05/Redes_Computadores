@@ -156,6 +156,24 @@ class PeerTable:
                 
         return new_peers
 
+    def update_peer(self, peer_id: str, ip: str, port: int, ttl: int):
+        """
+        Atualiza ou insere um peer na tabela a partir de uma conexão de entrada (inbound)
+        e marca o seu status como "CONNECTED".
+        """
+        if "@" in peer_id:
+            name, namespace = peer_id.split("@", 1)
+        else:
+            name = peer_id
+            namespace = "Default"
+            
+        if peer_id in self.peers:
+            self.peers[peer_id].update_info(ip, port, ttl)
+        else:
+            self.peers[peer_id] = PeerEntry(name, namespace, ip, port, ttl)
+            
+        self.mark_connected(peer_id)
+
     def get_peer(self, peer_id: str) -> Optional[PeerEntry]:
         """
         Busca e retorna o objeto completo PeerEntry associado ao peer_id informado.

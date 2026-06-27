@@ -20,6 +20,9 @@ from peer_table import PeerTable
 from typing import Dict
 
 async def _attempt_reconnect(peer_id, peer, peer_table, outbound_connections, logger):
+    if peer.status == "CONNECTED" or peer.peer_id in outbound_connections:
+        logger.debug(f"[Reconnect] Conexão ativa ou em andamento já existe para {peer.peer_id}. Cancelando reconexão.")
+        return
     logger.info(f"[Reconnect] Tentando reconectar automaticamente a {peer.peer_id} em {peer.ip}:{peer.port}")
     conn = PeerConnection(peer_id, peer_table)
     try:
@@ -36,7 +39,8 @@ async def _attempt_reconnect(peer_id, peer, peer_table, outbound_connections, lo
             logger.info(f"[Reconnect] Reconectado com sucesso a {peer.peer_id}")
             
     except Exception as e:
-        logger.warning(f"[Reconnect] Falha ao reconectar a {peer.peer_id}: {e}")
+        err_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+        logger.warning(f"[Reconnect] Falha ao reconectar a {peer.peer_id}: {err_msg}")
         peer_table.mark_failed_attempt(peer.peer_id)
 
 async def reconnection_loop(

@@ -37,13 +37,15 @@ class PeerServer:
     Esta classe gerencia a recepção e resposta de handshakes (HELLO) e mensagens de controle (PING/PONG).
     """
 
-    def __init__(self, peer_id, port, peer_table: Optional[PeerTable] = None):
+    def __init__(self, peer_id, port, peer_table: Optional[PeerTable] = None, shared_connections: Optional[dict] = None):
         # Identificador do peer local (ex: 'alice@CIC'). Usado para se apresentar a outros peers no handshake.
         self.peer_id = peer_id
         # Porta de rede local onde o servidor irá escutar conexões de entrada (ex: 5000)
         self.port = port
         # Tabela de peers compartilhada para gerenciar os estados das conexões
         self.peer_table = peer_table
+        # Dicionário de conexões ativas compartilhado com o cliente/CLI
+        self.shared_connections = shared_connections
         # Conexões ativas de clientes (inbound)
         self.active_connections = set()
         # Tarefas ativas de clientes (inbound)
@@ -69,60 +71,63 @@ class PeerServer:
         if current_task:
             self.active_tasks.add(current_task)
         try:
-            while True:
-                # 1. Leitura com enquadramento (Framing):
-                # O 'readline()' lê os bytes recebidos da rede até encontrar o delimitador de quebra de linha ('\n').
-                # Isso é fundamental porque, como o TCP é um fluxo contínuo, ler uma linha garante que pegamos 
-                # exatamente uma única mensagem JSON completa por vez.
-                data = await reader.readline()
+            # 1. O primeiro pacote deve ser obrigatoriamente um HELLO de handshake
+            try:
+                data = await asyncio.wait_for(reader.readline(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logging.getLogger(__name__).warning("[PeerServer] Timeout de 5s aguardando HELLO. Fechando conexão.")
+                return
+            if not data:
+                return
 
-                # 2. Detecção de Desconexão:
-                # Se 'data' vir vazio (bytes vazios), significa que o peer remoto fechou a conexão de forma
-                # limpa na outra ponta (EOF - End Of File). Encerramos o loop para liberar os recursos do socket.
-                if not data:
-                    break 
+            msg = decode_message(data)
 
-                # 3. Desserialização:
-                # Traduz os bytes recebidos para um dicionário Python contendo os campos da especificação do protocolo.
-                msg = decode_message(data)
-                
-                # Trata mensagens comuns (PING, SEND, PUB, BYE) usando o router
-                async def send_wrapper(data):
-                    writer.write(encode_message(data))
-                    await writer.drain()
+            if msg.get("type") != "HELLO":
+                logging.getLogger(__name__).warning("[PeerServer] Conexão rejeitada: primeira mensagem não é HELLO")
+                return
 
-                action = await process_common_messages(msg, self.peer_id, remote_peer, send_wrapper)
-                
-                if action == "BREAK":
-                    break
-                elif action == "HANDLED":
-                    # Opcional: manter log de mensagens recebidas no servidor
-                    if msg.get("type") in ["SEND", "PUB"]:
-                        self.received_messages.append(msg)
-                    continue
+            remote_peer = msg.get("peer_id", "desconhecido")
+            remote_addr = writer.get_extra_info('peername')
+            logging.getLogger(__name__).info(f"[PeerServer] Conexão de entrada de {remote_peer} em {remote_addr}")
 
-                # Processamento específico do Servidor (HELLO)
-                if msg.get("type") == "HELLO":
-                    remote_peer = msg.get("peer_id", "desconhecido")
-                    remote_addr = writer.get_extra_info('peername')
-                    logging.getLogger(__name__).info(f"[PeerServer] Conexão de entrada: {remote_peer} de {remote_addr}")
+            # --- EVITAR CONEXÕES DUPLICADAS ---
+            if self.shared_connections is not None and remote_peer in self.shared_connections:
+                existing_conn = self.shared_connections[remote_peer]
+                if existing_conn != "connecting":
+                    logging.getLogger(__name__).warning(f"[PeerServer] Conexão duplicada detectada para {remote_peer}. Rejeitando nova conexão.")
+                    return
 
-                    # Se estiver usando uma tabela de peers, registra o peer entrante
-                    if self.peer_table:
-                        self.peer_table.update_peer(remote_peer, remote_addr[0], remote_addr[1], msg.get("ttl", 3600))
-                    
-                    hello_ok = {
-                        "type": "HELLO_OK",
-                        "peer_id": self.peer_id,
-                        "status": "OK",
-                        "features": Config().features,
-                        "ttl": Config().fixed_msg_ttl
-                    }
-                    writer.write(encode_message(hello_ok))
-                    await writer.drain()
+            # Registra o peer na tabela
+            if self.peer_table:
+                self.peer_table.update_peer(remote_peer, remote_addr[0], remote_addr[1], msg.get("ttl", 3600))
 
-                else:
-                    logging.getLogger(__name__).info(f"Mensagem estruturada desconhecida recebida de {remote_peer or 'desconhecido'}: {msg}")
+            # Envia HELLO_OK
+            hello_ok = {
+                "type": "HELLO_OK",
+                "peer_id": self.peer_id,
+                "status": "OK",
+                "features": Config().features,
+                "ttl": Config().fixed_msg_ttl
+            }
+            writer.write(encode_message(hello_ok))
+            await writer.drain()
+
+            # Delega o gerenciamento e a escuta da conexão para a classe PeerConnection
+            if self.shared_connections is not None:
+                from peer_connection import PeerConnection
+                inbound_conn = PeerConnection(self.peer_id, self.peer_table)
+                inbound_conn.reader = reader
+                inbound_conn.writer = writer
+                inbound_conn.remote_peer_id = remote_peer
+
+                # Agenda envio periódico de keep-alive (PING) para o peer
+                inbound_conn.keepalive_task = asyncio.create_task(inbound_conn.keepalive_loop())
+                self.shared_connections[remote_peer] = inbound_conn
+
+                try:
+                    await inbound_conn.listen()
+                finally:
+                    self.shared_connections.pop(remote_peer, None)
 
         except Exception as e:
             logging.getLogger(__name__).error(f"Erro no servidor ao lidar com cliente {remote_peer or 'desconhecido'}: {e}")

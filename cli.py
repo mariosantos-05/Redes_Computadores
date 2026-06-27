@@ -97,6 +97,10 @@ async def cli_loop(
                         print(f"Peer desconhecido: {target_id}. Tente usar /peers para descobrir novos peers.")
                         continue
                     
+                    if peer_entry.status == "CONNECTED" or target_id in outbound_connections:
+                        print(f"Você já possui uma conexão ativa ou em andamento com o peer: {target_id}")
+                        continue
+                    
                     print(f"Conectando a {target_id} em {peer_entry.ip}:{peer_entry.port}...")
                     conn = PeerConnection(peer_id, peer_table)
                     try:
@@ -138,6 +142,8 @@ async def cli_loop(
                     # Reaproveita a conexão ativa, se já existir
                     conn = outbound_connections.get(p.peer_id)
                     if conn is None:
+                        if p.status == "CONNECTED" or p.peer_id in outbound_connections:
+                            continue
                         # Se não existir, tenta abrir a conexão em background para o envio
                         conn = PeerConnection(peer_id, peer_table)
                         try:
