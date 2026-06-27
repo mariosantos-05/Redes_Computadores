@@ -1,3 +1,17 @@
+# ==============================================================================
+# PROJETO: Chat P2P (Versão Revisada)
+# DISCIPLINA: Redes de Computadores
+# INSTITUIÇÃO: Universidade de Brasília (UnB) - CIC
+# GRUPO: 2
+#
+# MEMBROS DA EQUIPE:
+# - Gabriel Gonçalves Caldo (Matrícula: 231034627)
+# - Daniel Rodrigues de Abreu (Matrícula: 241038540)
+# - Mario Augusto Vieira dos Santos (Matrícula: 231035778)
+#
+# ARQUIVO: main.py
+# ==============================================================================
+
 import asyncio 
 import logging
 from peer_server import PeerServer
@@ -98,7 +112,8 @@ async def main():
     server_runner = await asyncio.start_server(
         server.handle_client,
         "0.0.0.0",
-        server.port
+        server.port,
+        limit=32768
     )
     logger.info(f"listening on port {server.port}")
 

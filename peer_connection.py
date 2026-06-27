@@ -1,3 +1,17 @@
+# ==============================================================================
+# PROJETO: Chat P2P (Versão Revisada)
+# DISCIPLINA: Redes de Computadores
+# INSTITUIÇÃO: Universidade de Brasília (UnB) - CIC
+# GRUPO: 2
+#
+# MEMBROS DA EQUIPE:
+# - Gabriel Gonçalves Caldo (Matrícula: 231034627)
+# - Daniel Rodrigues de Abreu (Matrícula: 241038540)
+# - Mario Augusto Vieira dos Santos (Matrícula: 231035778)
+#
+# ARQUIVO: peer_connection.py
+# ==============================================================================
+
 import asyncio
 import time
 import logging
@@ -147,7 +161,7 @@ class PeerConnection:
         """
         # Abre a conexão TCP de forma assíncrona. Retorna o leitor e o escritor do socket.
         self.reader, self.writer = await asyncio.wait_for(
-            asyncio.open_connection(host, port),
+            asyncio.open_connection(host, port, limit=32768),
             timeout=5.0
         )
 

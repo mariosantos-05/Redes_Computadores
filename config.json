@@ -1,6 +1,6 @@
 {
   "app_name": "pyp2p-chat",
-  "rdv_host": "192.168.1.115",
+  "rdv_host": "45.171.101.167",
   "rdv_port": 8080,
   "listen_host": "0.0.0.0",
   "listen_port": 8081,

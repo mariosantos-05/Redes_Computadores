@@ -1,3 +1,17 @@
+# ==============================================================================
+# PROJETO: Chat P2P (Versão Revisada)
+# DISCIPLINA: Redes de Computadores
+# INSTITUIÇÃO: Universidade de Brasília (UnB) - CIC
+# GRUPO: 2
+#
+# MEMBROS DA EQUIPE:
+# - Gabriel Gonçalves Caldo (Matrícula: 231034627)
+# - Daniel Rodrigues de Abreu (Matrícula: 241038540)
+# - Mario Augusto Vieira dos Santos (Matrícula: 231035778)
+#
+# ARQUIVO: cli.py
+# ==============================================================================
+
 import asyncio
 import sys
 import logging
