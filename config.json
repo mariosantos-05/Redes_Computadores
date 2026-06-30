@@ -1,16 +1,15 @@
 {
   "app_name": "pyp2p-chat",
-  "rdv_host": "45.171.101.167",
+  "rdv_host": "10.42.0.1",
   "rdv_port": 8080,
   "listen_host": "0.0.0.0",
-  "listen_port": 8081,
-  "tcp_port": 6767,
+  "tcp_port": 6821,
   "discover_interval": 20,
   "keepalive_interval": 30,
   "rdv_ttl": 3600,
   "fixed_msg_ttl": 1,
-  "namespace": "2010",
-  "name": "JustinBieber",
+  "namespace": "CIC",
+  "name": "Grupo2",
   "type": [
     "REGISTER",
     "DISCOVER"

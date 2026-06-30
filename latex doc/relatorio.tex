@@ -30,18 +30,19 @@
     breaklines=true,                 
     captionpos=b,                    
     keepspaces=true,                 
-    numbers=left,                    
+    numbers=none,                    
     numbersep=5pt,                  
     showspaces=false,                
     showstringspaces=false,
     showtabs=false,                  
     tabsize=2,
     extendedchars=true,
-    literate={á}{{\'a}}1 {ã}{{\~a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {õ}{{\~o}}1 {ú}{{\'u}}1 {ç}{{\c{c}}}1 {Á}{{\'A}}1 {Ã}{{\~A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Õ}{{\~O}}1 {Ú}{{\'U}}1 {Ç}{{\c{C}}}1
+    literate={á}{{\'a}}1 {ã}{{\~a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {õ}{{\~o}}1 {ú}{{\'u}}1 {ç}{{\c{c}}}1 {Á}{{\'A}}1 {Ã}{{\~A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Õ}{{\~O}}1 {Ú}{{\'U}}1 {Ç}{{\c{C}}}1 {â}{{\^a}}1 {ê}{{\^e}}1 {î}{{\^i}}1 {ô}{{\^o}}1 {û}{{\^u}}1 {Â}{{\^A}}1 {Ê}{{\^E}}1 {Î}{{\^I}}1 {Ô}{{\^O}}1 {Û}{{\^U}}1 {à}{{\`a}}1 {À}{{\`A}}1 {ü}{{\"u}}1 {Ü}{{\"U}}1
 }
 \lstset{style=mystyle}
 
 \begin{document}
+\pagestyle{empty}
 
 % =================== CAPA ===================
 \begin{titlepage}
@@ -58,7 +59,7 @@
         \hrule
         \vspace{0.8cm}
         {\huge \textbf{RELATÓRIO TÉCNICO}}\\[0.4cm]
-        {\LARGE \textit{Projeto de Chat P2P (Versão Revisada)}}\\[0.8cm]
+        {\LARGE \textit{Projeto de Chat P2P}}\\[0.8cm]
         \hrule
         \vfill
 
@@ -74,7 +75,7 @@
 % =================== CONTEÚDO ===================
 
 \section{Introdução}
-Este relatório técnico descreve a implementação do cliente de Chat P2P desenvolvido pelo Grupo 2 para a disciplina de Redes de Computadores da Universidade de Brasília (UnB). O sistema é capaz de se registrar e buscar pares em um servidor Rendezvous central, além de estabelecer conexões diretas TCP (\textit{Peer-to-Peer}) persistentes com outros clientes para a troca de mensagens, seguindo os requisitos estipulados na especificação do projeto. A comunicação ocorre 100\% em formato P2P após a descoberta de pares, isto é, sem saltos intermediários (\textit{relay}) e com a ausência de um ponto centralizado de troca de mensagens.
+Este relatório técnico descreve a implementação do cliente de Chat P2P desenvolvido pelo Grupo 2 para a disciplina de Redes de Computadores da Universidade de Brasília (UnB). O sistema é capaz de se registrar e buscar nós em um servidor Rendezvous central, além de estabelecer conexões diretas TCP (\textit{Peer-to-Peer}) persistentes com outros clientes para a troca de mensagens, seguindo os requisitos estipulados na especificação do projeto. A comunicação ocorre 100\% em formato P2P após a descoberta de nós, isto é, sem saltos intermediários e com a ausência de um ponto centralizado de troca de mensagens.
 
 \section{Arquitetura da Solução}
 A arquitetura do software foi concebida aproveitando ao máximo a biblioteca nativa assíncrona do Python (\texttt{asyncio}). Isto permite o tratamento concorrente de múltiplas conexões de rede numa \textit{thread} única, conferindo eficiência e simplicidade no controle de estado.
@@ -85,7 +86,7 @@ Abaixo, apresentamos o diagrama estrutural de como os módulos principais se org
 \begin{lstlisting}[basicstyle=\ttfamily\small, numbers=none]
 +-----------------------------------------------------+
 |                      main.py                        |
-|  (Ponto de entrada, inicializa loop e dependências) |
+|  (Ponto de entrada, inicializa loop e dependencias) |
 +--------------------------+--------------------------+
                            |
           +----------------v----------------+
@@ -114,11 +115,11 @@ Nossa implementação divide a lógica em diversos módulos desacoplados:
     \item \textbf{\texttt{main.py}}: Arquivo principal. Carrega as definições, registra no servidor central via \texttt{rendezvous\_connection.py} e inicia o ciclo do \textit{event loop} do \texttt{asyncio}, englobando interface com usuário e servidor.
     \item \textbf{\texttt{config.py}}: Classe central para carregar metadados e configurações do usuário a partir de \texttt{config.json} (como TTL e features do protocolo).
     \item \textbf{\texttt{logging\_config.py}}: Módulo contendo lógicas avançadas (como \texttt{ReadlineConsoleHandler}) para harmonizar as saídas assíncronas do terminal sem quebrar a renderização da interface do usuário.
-    \item \textbf{\texttt{peer\_server.py}}: Define o servidor local para escuta de conexões \textit{inbound} (recebidas) de outros pares P2P.
+    \item \textbf{\texttt{peer\_server.py}}: Define o servidor local para escuta de conexões \textit{inbound} (recebidas) de outros nós P2P.
     \item \textbf{\texttt{peer\_connection.py}}: Implementa o manipulador de cada conexão TCP bidirecional (\textit{inbound} ou \textit{outbound}). Ele abstrai a leitura delimitada por \texttt{\textbackslash n}, lida com pacotes \textit{keep-alive} (\texttt{PING/PONG}), negocia a sessão inicial com \texttt{HELLO/HELLO\_OK} e despacha as mensagens de chat recebidas.
     \item \textbf{\texttt{rendezvous\_connection.py}}: Concentra a requisição sobre \textit{sockets} para interagir com o servidor de Rendezvous, tratando comandos de \texttt{REGISTER}, \texttt{DISCOVER} e \texttt{UNREGISTER}.
     \item \textbf{\texttt{message\_router.py}}: O \textit{Router} é responsável por processar requisições P2P unificadas, evitando a duplicação de lógicas de protocolo para \textit{inbound} e \textit{outbound}. Se for uma mensagem \textit{unicast} (tipo \texttt{SEND}), ele exibe e envia o ACK. Se for \textit{broadcast} (tipo \texttt{PUB}), exibe publicamente e também auxilia no \textit{keep-alive} gerenciando PING/PONG.
-    \item \textbf{\texttt{peer\_table.py}}: Funciona como a tabela de vizinhos ou estado (\textit{State}). Ele armazena metadados de outros pares registrados na mesma sala (\textit{namespace}) e controla a saúde dos enlaces, marcando pares obsoletos como \texttt{STALE}.
+    \item \textbf{\texttt{peer\_table.py}}: Funciona como a tabela de vizinhos ou estado (\textit{State}). Ele armazena metadados de outros nós registrados na mesma sala (\textit{namespace}) e controla a saúde dos enlaces, marcando nós obsoletos como \texttt{STALE}.
     \item \textbf{\texttt{reconnection\_manager.py}}: Cuida das tarefas em plano de fundo de reconexões usando políticas configuráveis, como o \textit{backoff exponencial}, definindo quantas vezes uma conexão rompida deve ser retentada.
     \item \textbf{\texttt{cli.py}}: Fornece a interface visual baseada em linha de comando interativa para acesso humano. Transmite chamadas dos comandos (ex: \texttt{/msg}, \texttt{/pub}, \texttt{/conn}) para as outras camadas.
 \end{itemize}
@@ -271,7 +272,7 @@ Esta subseção responde às perguntas contidas na documentação técnica para 
 \end{enumerate}
 
 \subsection{Compilação do Código}
-Como o ecossistema é alicerçado sob a linguagem \textbf{Python}, não é feito uso de nenhuma linguagem \textit{Ahead-of-Time} (AoT) compilada, como C ou Java. Assim, \textbf{não deve ser feita nenhuma compilação prévia do código}. O código é interpretado dinamicamente durante o tempo de execução através do \textit{bytecode} do interpretador \texttt{python3}.
+Como o ecossistema é alicerçado sob a linguagem \textbf{Python}, não é feito uso de nenhuma linguagem compilada, como C ou Java. Assim, \textbf{não deve ser feita nenhuma compilação prévia do código}. O código é interpretado dinamicamente durante o tempo de execução através do interpretador \texttt{python3}.
 
 \subsection{Bibliotecas Necessárias e Como Instaladas}
 \textbf{Apenas a Biblioteca Padrão do Python (Standard Library)} foi utilizada. Bibliotecas como \texttt{asyncio}, \texttt{socket}, \texttt{json}, \texttt{logging} e \texttt{datetime} estão nativamente embarcadas no Python. \textbf{Não existem bibliotecas extras exigidas para o uso do programa}.
@@ -291,5 +292,53 @@ $ python3 main.py
     \item O \textit{CLI} interativo abrirá o canal após notificar seu registro com sucesso. Você pode, agora, explorar os comandos detalhados na Seção 4, e mostrados com o comando \texttt{/help}. 
     \item Digite \texttt{/quit} quando terminar de usar, para assim desregistrar-se no servidor e finalizar todas as sessões.
 \end{enumerate}
+
+\newpage
+\section{Apêndice: Códigos-Fonte}
+
+Esta seção contém o código-fonte integral dos módulos que compõem o sistema de Chat P2P do Grupo 2.
+
+\subsection{main.py}
+\lstinputlisting[language=Python]{../main.py}
+
+\newpage
+\subsection{config.py}
+\lstinputlisting[language=Python]{../config.py}
+
+\newpage
+\subsection{config.json}
+\lstinputlisting{../config.json}
+
+\newpage
+\subsection{logging\_config.py}
+\lstinputlisting[language=Python]{../logging_config.py}
+
+\newpage
+\subsection{cli.py}
+\lstinputlisting[language=Python]{../cli.py}
+
+\newpage
+\subsection{message\_router.py}
+\lstinputlisting[language=Python]{../message_router.py}
+
+\newpage
+\subsection{peer\_server.py}
+\lstinputlisting[language=Python]{../peer_server.py}
+
+\newpage
+\subsection{peer\_connection.py}
+\lstinputlisting[language=Python]{../peer_connection.py}
+
+\newpage
+\subsection{peer\_table.py}
+\lstinputlisting[language=Python]{../peer_table.py}
+
+\newpage
+\subsection{rendezvous\_connection.py}
+\lstinputlisting[language=Python]{../rendezvous_connection.py}
+
+\newpage
+\subsection{reconnection\_manager.py}
+\lstinputlisting[language=Python]{../reconnection_manager.py}
 
 \end{document}

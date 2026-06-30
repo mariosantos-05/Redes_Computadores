@@ -59,7 +59,8 @@ class Config:
                 raise ValueError("Configuração inválida: 'rdv_port' deve estar na faixa de 1 a 65535.")
             
             # Configurações do servidor local (porta em que este nó vai escutar conexões)
-            self.listen_port = int(data.get("tcp_port", 0)) # Usando tcp_port como porta de escuta principal
+            self.tcp_port = int(data.get("tcp_port", 0))
+            self.listen_port = self.tcp_port # Usando tcp_port como porta de escuta principal
             if not (0 <= self.listen_port <= 65535): # 0 é aceito para alocação dinâmica do sistema operacional nos testes
                 raise ValueError("Configuração inválida: 'tcp_port' deve estar na faixa de 0 a 65535.")
             
@@ -67,6 +68,7 @@ class Config:
             self.version = data.get("version", "1.0")
             self.features = data.get("features", ["ack"])
             self.fixed_msg_ttl = data.get("fixed_msg_ttl", 1)
+            self.type = data.get("type", ["REGISTER", "DISCOVER"])
             
             # Tempos de reconexão e TTL do Servidor
             self.max_reconnect_attempts = int(data.get("max_reconnect_attempts", 5))
