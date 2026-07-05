@@ -188,7 +188,11 @@ class RendezvousConnection:
         active_connections[peer.peer_id] = "connecting"
         
         from peer_connection import PeerConnection
-        conn = PeerConnection(local_peer_id, peer_table)
+        conn = PeerConnection(
+            local_peer_id,
+            peer_table,
+            on_close=lambda c: active_connections.pop(c.remote_peer_id, None) if c.remote_peer_id else None
+        )
         try:
             logger.info(f"[Descoberta] Iniciando conexão automática com peer descoberto {peer.peer_id} em {peer.ip}:{peer.port}...")
             await conn.connect(peer.ip, peer.port)

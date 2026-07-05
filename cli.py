@@ -37,6 +37,7 @@ async def cli_loop(
     peer_id: str,
     peer_table: PeerTable,
     outbound_connections: Dict[str, PeerConnection],
+    inbound_connections: Dict[str, PeerConnection],
     shutdown_event: asyncio.Event
 ):
     """
@@ -47,15 +48,13 @@ async def cli_loop(
     logger = logging.getLogger(__name__)
     await asyncio.sleep(1.0) # Aguarda 1 segundo para garantir que os logs iniciais (ex: registro) passem
 
-    ReadlineConsoleHandler.cli_active = True
+    ReadlineConsoleHandler.cli_active = False
 
     while not shutdown_event.is_set():
         try:
-            # Limpa qualquer prompt 'p2p> ' deixado pela thread de logs do ReadlineConsoleHandler
-            # garantindo que o input() desenhe apenas um único prompt na tela.
-            sys.stdout.write('\r\x1b[K')
-            sys.stdout.flush()
+            ReadlineConsoleHandler.cli_active = True
             line = await async_input("p2p> ")
+            ReadlineConsoleHandler.cli_active = False
             if shutdown_event.is_set():
                 break
             
@@ -76,8 +75,7 @@ async def cli_loop(
                     elif filter_arg.startswith("#"):
                         if p.namespace != filter_arg[1:]:
                             continue
-                    status_br = {"DISCONNECTED": "DESCONECTADO", "CONNECTED": "CONECTADO", "RECONNECTING": "RECONECTANDO", "STALE": "OBSOLETO"}.get(p.status, p.status)
-                    print(f"[{status_br}] {p.peer_id} em {p.ip}:{p.port} (TTL: {p.ttl})")
+                    print(f"[{p.status}] {p.peer_id} em {p.ip}:{p.port} (TTL: {p.ttl})")
                 print("-------------------")
 
             elif cmd == "/msg":
@@ -102,7 +100,11 @@ async def cli_loop(
                         continue
                     
                     print(f"Conectando a {target_id} em {peer_entry.ip}:{peer_entry.port}...")
-                    conn = PeerConnection(peer_id, peer_table)
+                    conn = PeerConnection(
+                        peer_id,
+                        peer_table,
+                        on_close=lambda c: outbound_connections.pop(c.remote_peer_id, None) if c.remote_peer_id else None
+                    )
                     try:
                         await conn.connect(peer_entry.ip, peer_entry.port)
                         # Inicia a tarefa de escuta contínua para essa nova conexão
@@ -145,7 +147,11 @@ async def cli_loop(
                         if p.status == "CONNECTED" or p.peer_id in outbound_connections:
                             continue
                         # Se não existir, tenta abrir a conexão em background para o envio
-                        conn = PeerConnection(peer_id, peer_table)
+                        conn = PeerConnection(
+                            peer_id,
+                            peer_table,
+                            on_close=lambda c: outbound_connections.pop(c.remote_peer_id, None) if c.remote_peer_id else None
+                        )
                         try:
                             await conn.connect(p.ip, p.port)
                             asyncio.create_task(conn.listen())
@@ -162,10 +168,13 @@ async def cli_loop(
                 print(f"Broadcast enviado para {count} peer(s).")
 
             elif cmd == "/conn":
-                print("--- Conexões Ativas de Saída ---")
+                print("--- Conexões Ativas de Entrada (Inbound) ---")
+                for pid, conn in inbound_connections.items():
+                    print(f"{pid} -> Connected")
+                print("--- Conexões Ativas de Saída (Outbound) ---")
                 # Exibe uma lista das conexões TCP que foram iniciadas por este nó
                 for pid, conn in outbound_connections.items():
-                    print(f"{pid} -> Conectado")
+                    print(f"{pid} -> Connected")
                 print("-----------------------------------------")
                 
             elif cmd == "/rtt":

@@ -33,7 +33,7 @@ class ReadlineConsoleHandler(logging.Handler):
             if ReadlineConsoleHandler.cli_active:
                 sys.stdout.write('\r\x1b[K')
                 sys.stdout.write(msg + '\n')
-                sys.stdout.write('p2p> ' + (readline.get_line_buffer() or ''))
+                readline.redisplay()
             else:
                 sys.stdout.write(msg + '\n')
             sys.stdout.flush()

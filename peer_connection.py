@@ -35,12 +35,15 @@ class PeerConnection:
     3. Manter a escuta em segundo plano para capturar as mensagens de chat que aquele peer te enviar.
     """
 
-    def __init__(self, peer_id, peer_table=None):
+    def __init__(self, peer_id, peer_table=None, on_close=None):
         # O identificador único do peer local (ex: 'Grupo2@CIC')
         self.peer_id = peer_id
         
         # Tabela de peers compartilhada
         self.peer_table = peer_table
+
+        # Callback executado ao fechar a conexão
+        self.on_close = on_close
         
         # Fluxo de entrada assíncrono para ler dados do socket do peer remoto
         self.reader: Optional[asyncio.StreamReader] = None
@@ -353,3 +356,8 @@ class PeerConnection:
                 pass
             self.writer = None
         self.reader = None
+        if self.on_close:
+            try:
+                self.on_close(self)
+            except Exception:
+                pass

@@ -31,6 +31,9 @@ def main():
         "test/test_5_broadcast.py",
         "test/test_6_termination.py",
         "test/test_7_reconnection.py",
+        "test/test_8_conn_and_states.py",
+        "test/test_9_cli.py",
+        "test/test_10_comprehensive.py",
     ]
     results = {}
 

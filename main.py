@@ -38,12 +38,13 @@ async def main():
     # 1. Instanciamento da tabela de peers e state da aplicação
     peer_table = PeerTable(max_reconnect_attempts=cfg.max_reconnect_attempts)
     outbound_connections = {}
+    inbound_connections = {}
     shutdown_event = asyncio.Event()
 
     # 2. Criação do servidor do Peer local:
     peer_id = f"{cfg.name}@{cfg.namespace}"
     port = cfg.listen_port
-    server = PeerServer(peer_id, port, peer_table, shared_connections=outbound_connections)
+    server = PeerServer(peer_id, port, peer_table, shared_connections=inbound_connections)
     
     # 3. Inicialização da conexão com o Rendezvous:
     rdv_conn = RendezvousConnection(
@@ -105,6 +106,7 @@ async def main():
             peer_id=peer_id,
             peer_table=peer_table,
             outbound_connections=outbound_connections,
+            inbound_connections=inbound_connections,
             shutdown_event=shutdown_event
         )
     )
@@ -127,8 +129,18 @@ async def main():
     finally:
         logger.info("Iniciando encerramento limpo...")
         
+        # Envia BYE para todas conexões de entrada ativas
+        for pid, conn in list(inbound_connections.items()):
+            if isinstance(conn, str):
+                continue
+            logger.info(f"Fechando conexão de entrada (inbound) com {pid}...")
+            await conn.disconnect(reason="Cliente está sendo desligado (shutdown)")
+            await conn.close()
+
         # Envia BYE para todas conexões de saída ativas
-        for pid, conn in outbound_connections.items():
+        for pid, conn in list(outbound_connections.items()):
+            if isinstance(conn, str):
+                continue
             logger.info(f"Fechando conexão de saída (outbound) com {pid}...")
             await conn.disconnect(reason="Cliente está sendo desligado (shutdown)")
             await conn.close()

@@ -24,7 +24,11 @@ async def _attempt_reconnect(peer_id, peer, peer_table, outbound_connections, lo
         logger.debug(f"[Reconnect] Conexão ativa ou em andamento já existe para {peer.peer_id}. Cancelando reconexão.")
         return
     logger.info(f"[Reconnect] Tentando reconectar automaticamente a {peer.peer_id} em {peer.ip}:{peer.port}")
-    conn = PeerConnection(peer_id, peer_table)
+    conn = PeerConnection(
+        peer_id,
+        peer_table,
+        on_close=lambda c: outbound_connections.pop(c.remote_peer_id, None) if c.remote_peer_id else None
+    )
     try:
         await conn.connect(peer.ip, peer.port)
         listen_task = asyncio.create_task(conn.listen())
