@@ -1,4 +1,4 @@
-# ==============================================================================
+# ================================================================
 # PROJETO: Chat P2P (Versão Revisada)
 # DISCIPLINA: Redes de Computadores
 # INSTITUIÇÃO: Universidade de Brasília (UnB) - CIC
@@ -10,7 +10,7 @@
 # - Mario Augusto Vieira dos Santos (Matrícula: 231035778)
 #
 # ARQUIVO: peer_connection.py
-# ==============================================================================
+# ================================================================
 
 import asyncio
 import time

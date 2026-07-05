@@ -1,6 +1,6 @@
 {
   "app_name": "pyp2p-chat",
-  "rdv_host": "10.42.0.1",
+  "rdv_host": "rdv.mfcaetano.cc",
   "rdv_port": 8080,
   "listen_host": "0.0.0.0",
   "tcp_port": 6821,
@@ -19,6 +19,5 @@
     "ack",
     "metrics"
   ],
-  "autonomous_mode": false,
   "max_reconnect_attempts": 5
 }
