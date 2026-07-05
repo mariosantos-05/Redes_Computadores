@@ -1,4 +1,4 @@
-# ==============================================================================
+# ================================================================
 # PROJETO: Chat P2P (Versão Revisada)
 # DISCIPLINA: Redes de Computadores
 # INSTITUIÇÃO: Universidade de Brasília (UnB) - CIC
@@ -10,11 +10,10 @@
 # - Mario Augusto Vieira dos Santos (Matrícula: 231035778)
 #
 # ARQUIVO: config.py
-# ==============================================================================
+# ================================================================
 
 import json
 import sys
-import os
 import uuid
 from pathlib import Path
 
@@ -78,7 +77,6 @@ class Config:
             
             # Parâmetros adicionais
             self.log_level = data.get("log_level", "INFO")
-            self.autonomous_mode = data.get("autonomous_mode", False)
             self.discover_interval = data.get("discover_interval", 20)
             self.keepalive_interval = data.get("keepalive_interval", 30)
             

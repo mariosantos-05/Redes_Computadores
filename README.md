@@ -312,15 +312,15 @@ Comandos disponíveis:
 
 | Comando | Função |
 |----------|--------|
+| `/help` | Exibir comandos disponíveis |
 | `/peers [* \| #namespace]` | Descobrir e listar peers |
-| `/msg <peer_id> <mensagem>` | Enviar mensagem direta |
-| `/pub * <mensagem>` | Enviar broadcast global |
-| `/pub #<namespace> <mensagem>` | Enviar mensagem para todos do namespace |
+| `/msg <peer_id> <mensagem>` | Enviar mensagem direta (unicast) |
+| `/pub <* \| #namespace> <mensagem>` | Enviar mensagem de difusão (broadcast) |
 | `/conn` | Mostrar conexões ativas (inbound/outbound) |
 | `/rtt` | Exibir RTT médio por peer |
-| `/reconnect` | Forçar reconciliação de peers |
-| `/log <Nível>` | Ajustar nível de log (DEBUG, INFO...) |
-| `/quit` | Encerrar aplicação |
+| `/reconnect` | Forçar reconciliação de peers (tentativa imediata) |
+| `/log <Nível>` | Ajustar nível de log (DEBUG, INFO, WARNING, ERROR) |
+| `/quit` | Encerrar aplicação de forma limpa |
 
 ---
 
@@ -328,24 +328,27 @@ Comandos disponíveis:
 
 O projeto está organizado nos seguintes módulos implementados:
 
-- **`main.py`** — Ponto de entrada da aplicação. Inicializa a tabela de peers local (`PeerTable`), realiza o registro inicial no servidor Rendezvous, inicia as tarefas assíncronas em background (registro periódico e descoberta) e executa o servidor local TCP. Também gerencia o tratamento de encerramento amigável (sinais de saída e `KeyboardInterrupt`) para desregistrar o nó de forma limpa.
-- **`randezvour_connection.py`** — Gerencia toda a comunicação com o servidor Rendezvous:
-  - `RandezvousConnection`: Classe responsável por transações de conexão curta TCP (envio de comando único e encerramento).
+- **`main.py`** — Ponto de entrada da aplicação. Inicializa a tabela de peers local (`PeerTable`), realiza o registro inicial no servidor Rendezvous, inicia as tarefas assíncronas em background (registro periódico, descoberta e reconexão) e executa o servidor local TCP. Também gerencia o tratamento de encerramento amigável (sinais de saída e `KeyboardInterrupt`) para desregistrar o nó de forma limpa.
+- **`rendezvous_connection.py`** — Gerencia toda a comunicação com o servidor Rendezvous:
+  - `RendezvousConnection`: Classe responsável por transações de conexão curta TCP (envio de comando único e encerramento).
   - `registration_loop(...)`: Loop em background que renova o registro (`REGISTER`) a cada 80% do tempo de TTL concedido.
-  - `discovery_loop(...)`: Loop em background que busca peers ativos (`DISCOVER`) no mesmo namespace periodicamente.
+  - `discovery_loop(...)`: Loop em background que busca peers ativos (`DISCOVER`) periodicamente e inicia a conexão automática com os novos peers descobertos.
   - `unregister(...)`: Envia a mensagem de `UNREGISTER` para notificar a saída do nó.
-- **`peer_server.py`** — Implementa a classe `PeerServer` que escuta por conexões de entrada TCP. Trata a recepção do handshake (`HELLO`) e requisições de controle/teste (`PING` respondendo com `PONG`).
-- **`peer_connection.py`** — Controla as conexões TCP de saída a outros peers, executando o handshake de conexão (`HELLO` / `HELLO_OK`) e escutando mensagens remotas em background.
+- **`peer_server.py`** — Implementa a classe `PeerServer` que escuta por conexões de entrada TCP. Trata a recepção do handshake (`HELLO`), envia `HELLO_OK` e delega a conexão a um objeto `PeerConnection` para gerenciar a escuta.
+- **`peer_connection.py`** — Controla as conexões TCP de saída a outros peers e gerencia a comunicação em cada canal de socket ativo (inbound e outbound). Realiza o handshake de conexão (`HELLO` / `HELLO_OK`), mantém o loop de escuta de mensagens em segundo plano (`listen`), executa envios de `SEND`, `PUB` e `BYE`, e realiza o cálculo de RTT através do keep-alive periódico (`PING`/`PONG`).
 - **`peer_table.py`** — Contém as estruturas de dados fundamentais do sistema:
   - `PeerEntry`: Armazena dados de rede (IP, porta, TTL), histórico de RTT e o estado atual da conexão (`CONNECTED`, `DISCONNECTED`, `RECONNECTING`, `STALE`).
   - `PeerTable`: Gerencia a lista de peers conhecidos, controla as regras de reconexão automática e o algoritmo de **backoff exponencial**.
-- **`messages.py`** — Define os métodos de codificação (`encode_message`) e decodificação (`decode_message`) em bytes UTF-8 formatados em JSON terminados em `\n`.
+- **`message_router.py`** — Define os métodos de codificação (`encode_message`) e decodificação (`decode_message`) em bytes UTF-8 formatados em JSON terminados em `\n`, com validação dos formatos dos campos obrigatórios. Também implementa a função `process_common_messages` para o tratamento de mensagens comuns do protocolo (como `PING`, `SEND`, `PUB` e `BYE`) compartilhada entre as conexões.
+- **`cli.py`** — Implementa a Interface de Linha de Comando (CLI) interativa (`cli_loop`), permitindo que o usuário envie comandos de forma assíncrona (`async_input`) sem bloquear as tarefas de rede em background.
+- **`reconnection_manager.py`** — Implementa o loop de reconexão automática em segundo plano (`reconnection_loop`), que busca peers no estado `RECONNECTING` cujos tempos de penalidade de backoff expiraram e tenta restabelecer a conexão TCP ativamente.
+- **`logging_config.py`** — Configura o logger global com suporte a múltiplos destinos (saída no terminal e persistência em arquivo `p2p.log`). Implementa o handler customizado `ReadlineConsoleHandler` que gerencia a impressão de logs em segundo plano sem poluir ou quebrar o prompt interativo da CLI.
 - **`config.py` e `config.json`** — Centralizam as configurações globais do peer local, servidor Rendezvous e limites/intervalos de tempo do protocolo.
 
 ### Funcionamento dos Loops de Background e Encerramento Controlado
 
 1. **Loop de Descoberta Automática (`DISCOVER`)**:
-   Iniciado em background no `main.py` via `asyncio.create_task`. Ele consulta periodicamente (a cada `discover_interval_sec` do `config.json`, padrão 60s) o servidor Rendezvous e atualiza dinamicamente a tabela local com novos peers ou atualizações de IPs/portas.
+   Iniciado em background no `main.py` via `asyncio.create_task`. Ele consulta periodicamente (a cada `discover_interval` do `config.json`, padrão 20s) o servidor Rendezvous e atualiza dinamicamente a tabela local com novos peers ou atualizações de IPs/portas.
 
 2. **Renovação de Registro Periódica (`REGISTER`)**:
    O primeiro registro ocorre no startup de maneira síncrona. Em seguida, a tarefa `registration_loop` monitora a expiração e realiza novos envios de `REGISTER`. Para garantir que o registro nunca expire por latência de rede, a atualização ocorre com margem de segurança de **80% do TTL concedido** (ex: se o TTL é 3600s, re-registra a cada 2880s). Se houver falha de rede, ele re-tenta a cada 10s.
