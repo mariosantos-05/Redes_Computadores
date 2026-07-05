@@ -91,11 +91,11 @@ class PeerServer:
             logging.getLogger(__name__).info(f"[PeerServer] Conexão de entrada de {remote_peer} em {remote_addr}")
 
             # --- EVITAR CONEXÕES DUPLICADAS ---
-            if self.shared_connections is not None and remote_peer in self.shared_connections:
-                existing_conn = self.shared_connections[remote_peer]
-                if existing_conn != "connecting":
-                    logging.getLogger(__name__).warning(f"[PeerServer] Conexão duplicada detectada para {remote_peer}. Rejeitando nova conexão.")
-                    return
+            # if self.shared_connections is not None and remote_peer in self.shared_connections:
+            #     existing_conn = self.shared_connections[remote_peer]
+            #     if existing_conn != "connecting":
+            #         logging.getLogger(__name__).warning(f"[PeerServer] Conexão duplicada detectada para {remote_peer}. Rejeitando nova conexão.")
+            #         return
 
             # Registra o peer na tabela
             if self.peer_table:
