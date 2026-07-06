@@ -12,13 +12,13 @@
 \contentsline {subsection}{\numberline {5.4}Passos Necessários para Executar o Programa}{8}{subsection.5.4}%
 \contentsline {section}{\numberline {6}Apêndice: Códigos-Fonte}{10}{section.6}%
 \contentsline {subsection}{\numberline {6.1}main.py}{10}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}config.py}{15}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}config.json}{18}{subsection.6.3}%
-\contentsline {subsection}{\numberline {6.4}logging\_config.py}{19}{subsection.6.4}%
-\contentsline {subsection}{\numberline {6.5}cli.py}{22}{subsection.6.5}%
-\contentsline {subsection}{\numberline {6.6}message\_router.py}{29}{subsection.6.6}%
-\contentsline {subsection}{\numberline {6.7}peer\_server.py}{34}{subsection.6.7}%
-\contentsline {subsection}{\numberline {6.8}peer\_connection.py}{40}{subsection.6.8}%
-\contentsline {subsection}{\numberline {6.9}peer\_table.py}{52}{subsection.6.9}%
-\contentsline {subsection}{\numberline {6.10}rendezvous\_connection.py}{62}{subsection.6.10}%
-\contentsline {subsection}{\numberline {6.11}reconnection\_manager.py}{69}{subsection.6.11}%
+\contentsline {subsection}{\numberline {6.2}config.py}{16}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}config.json}{19}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}logging\_config.py}{20}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}cli.py}{23}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}message\_router.py}{31}{subsection.6.6}%
+\contentsline {subsection}{\numberline {6.7}peer\_server.py}{36}{subsection.6.7}%
+\contentsline {subsection}{\numberline {6.8}peer\_connection.py}{42}{subsection.6.8}%
+\contentsline {subsection}{\numberline {6.9}peer\_table.py}{54}{subsection.6.9}%
+\contentsline {subsection}{\numberline {6.10}rendezvous\_connection.py}{64}{subsection.6.10}%
+\contentsline {subsection}{\numberline {6.11}reconnection\_manager.py}{71}{subsection.6.11}%
