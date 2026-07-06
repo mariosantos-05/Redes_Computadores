@@ -26,6 +26,7 @@ class ReadlineConsoleHandler(logging.Handler):
     o usuário já havia digitado, criando a ilusão de um chat sem interrupções.
     """
     cli_active = False # Flag controlada pelo cli.py para saber se estamos no prompt
+    cli_prompt = "p2p> " # Prompt padrão da CLI
 
     def emit(self, record):
         try:
@@ -33,6 +34,8 @@ class ReadlineConsoleHandler(logging.Handler):
             if ReadlineConsoleHandler.cli_active:
                 sys.stdout.write('\r\x1b[K')
                 sys.stdout.write(msg + '\n')
+                sys.stdout.write(ReadlineConsoleHandler.cli_prompt + readline.get_line_buffer())
+                sys.stdout.flush()
                 readline.redisplay()
             else:
                 sys.stdout.write(msg + '\n')

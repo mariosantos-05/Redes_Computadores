@@ -52,6 +52,7 @@ async def cli_loop(
 
     while not shutdown_event.is_set():
         try:
+            ReadlineConsoleHandler.cli_prompt = "p2p> "
             ReadlineConsoleHandler.cli_active = True
             line = await async_input("p2p> ")
             ReadlineConsoleHandler.cli_active = False
