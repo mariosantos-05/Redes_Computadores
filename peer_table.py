@@ -216,6 +216,11 @@ class PeerTable:
         if not peer:
             return
 
+        # Se o peer já estiver ativo e conectado (por exemplo, via uma conexão inbound de entrada),
+        # não devemos registrar a falha de uma tentativa de conexão paralela de saída.
+        if peer.status == "CONNECTED":
+            return
+
         peer.reconnect_attempts += 1
         now = time.time()
         peer.last_attempt_time = now
