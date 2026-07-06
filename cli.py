@@ -87,7 +87,8 @@ async def cli_loop(
                 msg_content = parts[2]
                 
                 # Verifica se já possuímos uma conexão TCP ativa com este peer
-                conn = outbound_connections.get(target_id)
+                # Verifica se já possuímos uma conexão TCP ativa com este peer (de saída ou de entrada)
+                conn = outbound_connections.get(target_id) or inbound_connections.get(target_id)
                 
                 # Se não possuir, tenta descobrir o peer e estabelecer a conexão
                 if conn is None:
@@ -96,7 +97,7 @@ async def cli_loop(
                         print(f"Peer desconhecido: {target_id}. Tente usar /peers para descobrir novos peers.")
                         continue
                     
-                    if peer_entry.status == "CONNECTED" or target_id in outbound_connections:
+                    if peer_entry.status == "CONNECTED" or target_id in outbound_connections or target_id in inbound_connections:
                         print(f"Você já possui uma conexão ativa ou em andamento com o peer: {target_id}")
                         continue
                     
@@ -123,6 +124,8 @@ async def cli_loop(
                     print(f"Falha ao enviar mensagem: {e}")
                     if target_id in outbound_connections:
                         del outbound_connections[target_id]
+                    if target_id in inbound_connections:
+                        del inbound_connections[target_id]
 
             elif cmd == "/pub":
                 if len(parts) < 3:
@@ -142,10 +145,10 @@ async def cli_loop(
 
                 count = 0
                 for p in target_peers:
-                    # Reaproveita a conexão ativa, se já existir
-                    conn = outbound_connections.get(p.peer_id)
+                    # Reaproveita a conexão ativa, se já existir (de saída ou de entrada)
+                    conn = outbound_connections.get(p.peer_id) or inbound_connections.get(p.peer_id)
                     if conn is None:
-                        if p.status == "CONNECTED" or p.peer_id in outbound_connections:
+                        if p.status == "CONNECTED" or p.peer_id in outbound_connections or p.peer_id in inbound_connections:
                             continue
                         # Se não existir, tenta abrir a conexão em background para o envio
                         conn = PeerConnection(
